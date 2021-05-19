@@ -1,0 +1,19 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group 'ru.bulldog.cloudstorage'
+version '1.0-SNAPSHOT'
+
+application {
+    mainClass = 'ru.bulldog.cloudstorage.Client'
+}
+
+dependencies {
+    implementation project(':common')
+}
+
+test {
+    useJUnitPlatform()
+}
