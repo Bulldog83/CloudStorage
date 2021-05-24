@@ -6,14 +6,17 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketException;
+import java.net.*;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class ServerNetworkHandler implements NetworkHandler {
@@ -23,15 +26,34 @@ public class ServerNetworkHandler implements NetworkHandler {
 
 	private final List<Connection> clients = Lists.newArrayList();
 
-	private ServerSocket server;
+	private ServerSocketChannel server;
+	private ServerSocket serverSocket;
+	private Selector selector;
 
 	public ServerNetworkHandler() {
 		try {
-			this.server = new ServerSocket(8099);
+			this.server = ServerSocketChannel.open();
+			server.bind(new InetSocketAddress(8099));
+			server.configureBlocking(false);
+			this.selector = Selector.open();
+			server.register(selector, SelectionKey.OP_ACCEPT);
+			this.serverSocket = server.socket();
 			Thread serverThread = new Thread(() -> {
 				try {
 					while (isAlive()) {
-						Socket connection = server.accept();
+						selector.select();
+						Set<SelectionKey> selectionKeys = selector.selectedKeys();
+						Iterator<SelectionKey> keyIterator = selectionKeys.iterator();
+
+						while (keyIterator.hasNext()) {
+							SelectionKey selectionKey = keyIterator.next();
+							if (selectionKey.isAcceptable()) {
+								handleAccept(selectionKey);
+							}
+							keyIterator.remove();
+						}
+
+						Socket connection = serverSocket.accept();
 						ClientConnection client = new ClientConnection(this, connection);
 						handleListRequest(client);
 						client.listen();
@@ -45,9 +67,16 @@ public class ServerNetworkHandler implements NetworkHandler {
 			});
 			serverThread.setDaemon(true);
 			serverThread.start();
+			LOGGER.info("Server started.");
 		} catch (Exception ex) {
 			LOGGER.error(ex.getLocalizedMessage(), ex);
 		}
+	}
+
+	private void handleAccept(SelectionKey selectionKey) throws IOException {
+		SocketChannel channel = server.accept();
+		channel.configureBlocking(false);
+		channel.register(selector, SelectionKey.OP_READ);
 	}
 
 	@Override
@@ -113,7 +142,7 @@ public class ServerNetworkHandler implements NetworkHandler {
 	}
 
 	public boolean isAlive() {
-		return server != null && !server.isClosed();
+		return server != null && server.isOpen();
 	}
 
 	@Override

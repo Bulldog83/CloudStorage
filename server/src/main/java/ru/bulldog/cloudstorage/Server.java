@@ -16,7 +16,7 @@ public class Server {
 			while (true) {
 				if (console.hasNext()) {
 					String line = console.nextLine();
-					if (line.equals("/stop")) {
+					if (line.equals("halt")) {
 						server.close();
 						break;
 					}
