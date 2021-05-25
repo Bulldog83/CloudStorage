@@ -2,6 +2,7 @@ package ru.bulldog.cloudstorage.network;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.network.packet.Packet;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;

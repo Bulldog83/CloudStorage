@@ -8,8 +8,8 @@ import javafx.scene.control.ListView;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.network.ClientNetworkHandler;
-import ru.bulldog.cloudstorage.network.FilePacket;
-import ru.bulldog.cloudstorage.network.FileRequest;
+import ru.bulldog.cloudstorage.network.packet.FilePacket;
+import ru.bulldog.cloudstorage.network.packet.FileRequest;
 import ru.bulldog.cloudstorage.network.ServerConnection;
 
 import java.io.File;

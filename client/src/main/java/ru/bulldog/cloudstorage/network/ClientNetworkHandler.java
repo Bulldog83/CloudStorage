@@ -4,6 +4,9 @@ import javafx.application.Platform;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.gui.controllers.MainController;
+import ru.bulldog.cloudstorage.network.packet.FilePacket;
+import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
+import ru.bulldog.cloudstorage.network.packet.Packet;
 
 import java.io.File;
 import java.io.IOException;

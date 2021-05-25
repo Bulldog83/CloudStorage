@@ -1,4 +1,4 @@
-package ru.bulldog.cloudstorage.network;
+package ru.bulldog.cloudstorage.network.packet;
 
 import java.io.IOException;
 import java.nio.file.Files;
