@@ -13,13 +13,10 @@ public class Server {
 	public static void main(String[] args) {
 		try(ServerNetworkHandler server = new ServerNetworkHandler()) {
 			Scanner console = new Scanner(System.in);
-			while (true) {
+			while (server.isAlive()) {
 				if (console.hasNext()) {
 					String line = console.nextLine();
-					if (line.equals("/stop")) {
-						server.close();
-						break;
-					}
+					server.handleCommand(line, System.out);
 				}
 			}
 		} catch (Exception ex) {

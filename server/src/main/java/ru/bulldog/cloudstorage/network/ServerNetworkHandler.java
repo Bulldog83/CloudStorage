@@ -3,39 +3,65 @@ package ru.bulldog.cloudstorage.network;
 import com.google.common.collect.Lists;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.command.ServerCommand;
+import ru.bulldog.cloudstorage.command.ServerCommands;
+import ru.bulldog.cloudstorage.data.DataBuffer;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketException;
+import java.io.OutputStream;
+import java.net.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class ServerNetworkHandler implements NetworkHandler {
 
 	private final static Logger LOGGER = LogManager.getLogger(ServerNetworkHandler.class);
+	private final static byte[] WRONG_COMMAND_BYTES;
 	private final static Path filesDir;
 
 	private final List<Connection> clients = Lists.newArrayList();
 
-	private ServerSocket server;
+	private ServerSocketChannel server;
+	private ServerSocket serverSocket;
+	private Selector selector;
+	private ByteBuffer buffer;
+	private ServerCommands commands;
 
 	public ServerNetworkHandler() {
 		try {
-			this.server = new ServerSocket(8099);
+			this.server = ServerSocketChannel.open();
+			server.bind(new InetSocketAddress(8099));
+			server.configureBlocking(false);
+			this.selector = Selector.open();
+			server.register(selector, SelectionKey.OP_ACCEPT);
+			this.serverSocket = server.socket();
+			this.buffer = ByteBuffer.allocate(1024);
+			this.commands = new ServerCommands(this);
 			Thread serverThread = new Thread(() -> {
 				try {
 					while (isAlive()) {
-						Socket connection = server.accept();
-						ClientConnection client = new ClientConnection(this, connection);
-						handleListRequest(client);
-						client.listen();
-						clients.add(client);
+						selector.select();
+						Set<SelectionKey> selectionKeys = selector.selectedKeys();
+						Iterator<SelectionKey> keyIterator = selectionKeys.iterator();
+
+						while (keyIterator.hasNext()) {
+							SelectionKey selectionKey = keyIterator.next();
+							if (selectionKey.isAcceptable()) {
+								handleAccept(selectionKey);
+							}
+							if (selectionKey.isReadable()) {
+								handleRead(selectionKey);
+							}
+							keyIterator.remove();
+						}
 					}
 				} catch (SocketException sEx) {
 					LOGGER.warn(sEx.getLocalizedMessage());
@@ -45,8 +71,83 @@ public class ServerNetworkHandler implements NetworkHandler {
 			});
 			serverThread.setDaemon(true);
 			serverThread.start();
+			LOGGER.info("Server started.");
 		} catch (Exception ex) {
 			LOGGER.error(ex.getLocalizedMessage(), ex);
+		}
+	}
+
+	public Path getFilesDir() {
+		return filesDir;
+	}
+
+	private void handleRead(SelectionKey selectionKey) {
+		try {
+			SocketChannel channel = (SocketChannel) selectionKey.channel();
+			try {
+				int read;
+				DataBuffer dataBuffer = new DataBuffer();
+				while (channel.isOpen()) {
+					read = channel.read(buffer);
+					if (read == -1) {
+						channel.close();
+						return;
+					}
+					if (read == 0) break;
+					buffer.flip();
+					dataBuffer.read(buffer);
+					buffer.clear();
+				}
+				String data = new String(dataBuffer.getBytes(), StandardCharsets.UTF_8).trim();
+				try(ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+					if (!handleCommand(data, outputStream)) {
+						channel.write(ByteBuffer.wrap(WRONG_COMMAND_BYTES));
+					} else {
+						byte[] bytes = outputStream.toByteArray();
+						channel.write(ByteBuffer.wrap(bytes));
+					}
+				}
+				dataBuffer.reset();
+			} catch (Exception ex) {
+				LOGGER.warn(ex.getLocalizedMessage(), ex);
+				channel.close();
+			}
+		} catch (Exception ex) {
+			LOGGER.error(ex.getLocalizedMessage(), ex);
+		}
+	}
+
+	public boolean handleCommand(String data, OutputStream output) {
+		Optional<ServerCommand> command = ServerCommand.of(data);
+		if (command.isPresent()) {
+			try {
+				byte[] result = commands.execute(command.get());
+				if (output != null) {
+					output.write(result);
+				}
+				return true;
+			} catch (Exception ex) {
+				LOGGER.warn(ex.getMessage(), ex);
+			}
+		}
+		return false;
+	}
+
+	private void handleAccept(SelectionKey selectionKey) {
+		try {
+			Socket connection = serverSocket.accept();
+			try {
+				ClientConnection client = new ClientConnection(this, connection);
+				handleListRequest(client);
+				client.listen();
+				clients.add(client);
+			} catch (Exception ex) {
+				SocketChannel channel = connection.getChannel();
+				channel.configureBlocking(false);
+				channel.register(selector, SelectionKey.OP_READ);
+			}
+		} catch (Exception ex) {
+			LOGGER.warn(ex.getLocalizedMessage(), ex);
 		}
 	}
 
@@ -113,7 +214,7 @@ public class ServerNetworkHandler implements NetworkHandler {
 	}
 
 	public boolean isAlive() {
-		return server != null && !server.isClosed();
+		return server != null && server.isOpen();
 	}
 
 	@Override
@@ -139,5 +240,6 @@ public class ServerNetworkHandler implements NetworkHandler {
 			LOGGER.error("Can't create files dir.");
 		}
 		filesDir = dirFiles.toPath();
+		WRONG_COMMAND_BYTES = "Unknown command.\n\r".getBytes(StandardCharsets.UTF_8);
 	}
 }

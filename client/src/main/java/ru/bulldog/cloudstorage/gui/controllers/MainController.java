@@ -1,5 +1,6 @@
 package ru.bulldog.cloudstorage.gui.controllers;
 
+import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -70,14 +71,22 @@ public class MainController implements Initializable, AutoCloseable {
 	@Override
 	public void initialize(URL location, ResourceBundle resources) {
 		File runDir = new File(".");
-		try {
-			refreshFiles(Files.list(runDir.toPath()).map(Path::toFile)
-					.collect(Collectors.toList()));
-			networkHandler = new ClientNetworkHandler(this);
-			connect();
-		} catch (Exception ex) {
-			LOGGER.error(ex.getLocalizedMessage(), ex);
-		}
+		new Thread(() -> {
+			try {
+				networkHandler = new ClientNetworkHandler(this);
+				connect();
+				Platform.runLater(() -> {
+					try {
+						refreshFiles(Files.list(runDir.toPath()).map(Path::toFile)
+								.collect(Collectors.toList()));
+					} catch (IOException ex) {
+						LOGGER.error(ex.getLocalizedMessage(), ex);
+					}
+				});
+			} catch (Exception ex) {
+				LOGGER.error(ex.getLocalizedMessage(), ex);
+			}
+		}).start();
 	}
 
 	@Override
