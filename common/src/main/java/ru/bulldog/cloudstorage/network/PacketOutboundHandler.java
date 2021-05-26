@@ -7,7 +7,7 @@ import ru.bulldog.cloudstorage.network.packet.Packet;
 public class PacketOutboundHandler extends SimpleChannelOutboundHandler<Packet> {
 
 	@Override
-	public void write0(ChannelHandlerContext ctx, Packet msg, ChannelPromise promise) throws Exception {
-
+	public void write0(ChannelHandlerContext ctx, Packet packet, ChannelPromise promise) throws Exception {
+		ctx.writeAndFlush(packet, promise);
 	}
 }

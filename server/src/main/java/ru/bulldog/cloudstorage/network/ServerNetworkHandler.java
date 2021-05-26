@@ -125,16 +125,20 @@ public class ServerNetworkHandler implements NetworkHandler {
 		Optional<ServerCommand> command = ServerCommand.of(data);
 		if (command.isPresent()) {
 			try {
-				byte[] result = commands.execute(command.get());
-				if (output != null) {
-					output.write(result);
-				}
+				handleCommand(command.get(), output);
 				return true;
 			} catch (Exception ex) {
 				LOGGER.warn(ex.getMessage(), ex);
 			}
 		}
 		return false;
+	}
+
+	public void handleCommand(ServerCommand command, OutputStream output) throws Exception {
+		byte[] result = commands.execute(command);
+		if (output != null) {
+			output.write(result);
+		}
 	}
 
 	private void handleAccept(SelectionKey selectionKey) {
