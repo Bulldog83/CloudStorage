@@ -11,9 +11,10 @@ public class Server {
 	public final static Logger LOGGER = LogManager.getLogger(Server.class);
 
 	public static void main(String[] args) {
-		try(ServerNetworkHandler server = new ServerNetworkHandler()) {
+		try(ServerNetworkHandler server = new ServerNetworkHandler(8072)) {
+			server.start();
 			Scanner console = new Scanner(System.in);
-			while (server.isAlive()) {
+			while (true) {
 				if (console.hasNext()) {
 					String line = console.nextLine();
 					server.handleCommand(line, System.out);

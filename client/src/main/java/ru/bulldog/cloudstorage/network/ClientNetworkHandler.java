@@ -1,43 +1,73 @@
 package ru.bulldog.cloudstorage.network;
 
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import javafx.application.Platform;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.gui.controllers.MainController;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
+import ru.bulldog.cloudstorage.network.packet.ListRequest;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 
 import java.io.File;
-import java.io.IOException;
-import java.net.Socket;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class ClientNetworkHandler implements NetworkHandler {
 
 	private final static Path filesDir;
-	private static final Logger LOGGER = LogManager.getLogger(ClientNetworkHandler.class);
+	private static final Logger logger = LogManager.getLogger(ClientNetworkHandler.class);
 
 	private final MainController controller;
-	private ServerConnection connection;
+	private SocketChannel socketChannel;
+	private final int port;
 
-	public ClientNetworkHandler(MainController controller) {
+	public ClientNetworkHandler(MainController controller, int port) {
 		this.controller = controller;
+		this.port = port;
+
+		Thread connectionThread = new Thread(() -> {
+			EventLoopGroup worker = new NioEventLoopGroup();
+			try {
+				Bootstrap bootstrap = new Bootstrap();
+				bootstrap.group(worker)
+						.channel(NioSocketChannel.class)
+						.handler(new ChannelInitializer<SocketChannel>() {
+							@Override
+							protected void initChannel(SocketChannel channel) throws Exception {
+								socketChannel = channel;
+								channel.pipeline().addLast(
+										new ClientInboundHandler(),
+										new ClientPacketInboundHandler(controller),
+										new ClientPacketOutboundHandler()
+								);
+							}
+						});
+				ChannelFuture channelFuture = bootstrap.connect("localhost", port).sync();
+				channelFuture.addListener(future -> {
+					if (future.isSuccess()) {
+						socketChannel.writeAndFlush(new ListRequest());
+					}
+				});
+				channelFuture.channel().closeFuture().sync();
+			} catch (Exception ex) {
+				logger.error("Connection error.", ex);
+			} finally {
+				worker.shutdownGracefully();
+			}
+		});
+		connectionThread.setDaemon(true);
+		connectionThread.start();
 	}
 
-	public ServerConnection getConnection() throws IOException {
-		if (connection != null && connection.isConnected()) {
-			return connection;
-		}
-		Socket socket = new Socket("localhost", 8099);
-		this.connection = new ServerConnection(this, socket);
-		connection.listen();
-		return connection;
-	}
+
 
 	@Override
 	public void handlePacket(Connection connection, Packet packet) {
@@ -52,23 +82,23 @@ public class ClientNetworkHandler implements NetworkHandler {
 	}
 
 	private void handleFile(FilePacket packet) {
-		if (!packet.isEmpty()) {
-			try {
-				Path output = filesDir.resolve(packet.getName());
-				byte[] data = packet.getData();
-				Files.write(output, data, StandardOpenOption.CREATE);
-				Platform.runLater(() -> {
-					try {
-						controller.refreshFiles(Files.list(filesDir).map(Path::toFile)
-								.collect(Collectors.toList()));
-					} catch (IOException ex) {
-						LOGGER.warn(ex.getLocalizedMessage(), ex);
-					}
-				});
-			} catch (Exception ex) {
-				LOGGER.warn(ex.getLocalizedMessage(), ex);
-			}
-		}
+//		if (!packet.isEmpty()) {
+//			try {
+//				Path output = filesDir.resolve(packet.getName());
+//				byte[] data = packet.getData();
+//				Files.write(output, data, StandardOpenOption.CREATE);
+//				Platform.runLater(() -> {
+//					try {
+//						controller.refreshFiles(Files.list(filesDir).map(Path::toFile)
+//								.collect(Collectors.toList()));
+//					} catch (IOException ex) {
+//						LOGGER.warn(ex.getLocalizedMessage(), ex);
+//					}
+//				});
+//			} catch (Exception ex) {
+//				LOGGER.warn(ex.getLocalizedMessage(), ex);
+//			}
+//		}
 	}
 
 	private void handleFilesList(FilesListPacket packet) {
@@ -78,7 +108,7 @@ public class ClientNetworkHandler implements NetworkHandler {
 
 	@Override
 	public void close() throws Exception {
-		connection.close();
+
 	}
 
 	static {

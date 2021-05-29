@@ -22,7 +22,6 @@ public class ServerCommands {
 	public byte[] execute(ServerCommand command) throws Exception {
 		switch (command) {
 			case HALT:
-				server.close();
 				System.exit(0);
 				return success();
 			case LS:

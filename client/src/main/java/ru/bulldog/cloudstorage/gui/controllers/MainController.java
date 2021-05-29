@@ -31,26 +31,25 @@ public class MainController implements Initializable, AutoCloseable {
 	public ListView<String> serverFiles;
 
 	public void sendFile(ActionEvent actionEvent) {
-		File file = clientFiles.getSelectionModel().getSelectedItem();
-		if (file != null) {
-			try {
-				if (!connection.isConnected()) {
-					connect();
-				}
-				FilePacket packet = new FilePacket(file.toPath());
-				connection.sendData(packet);
-			} catch (Exception ex) {
-				LOGGER.warn(ex.getLocalizedMessage(), ex);
-			}
-		}
+//		File file = clientFiles.getSelectionModel().getSelectedItem();
+//		if (file != null) {
+//			try {
+//				if (!connection.isConnected()) {
+//					connect();
+//				}
+//				FilePacket packet = new FilePacket(file.toPath());
+//				connection.sendData(packet);
+//			} catch (Exception ex) {
+//				LOGGER.warn(ex.getLocalizedMessage(), ex);
+//			}
+//		}
 	}
 
 	public void requestFile(ActionEvent actionEvent) {
 		String name = serverFiles.getSelectionModel().getSelectedItem();
 		if (name != null) {
 			try {
-				FileRequest packet = new FileRequest(name);
-				connection.sendData(packet);
+				//FileRequest packet = new FileRequest(name);
 			} catch (Exception ex) {
 				LOGGER.warn(ex.getLocalizedMessage(), ex);
 			}
@@ -58,11 +57,6 @@ public class MainController implements Initializable, AutoCloseable {
 	}
 
 	private ClientNetworkHandler networkHandler;
-	private ServerConnection connection;
-
-	private void connect() throws IOException {
-		connection = networkHandler.getConnection();
-	}
 
 	public void refreshFiles(Collection<File> files) {
 		clientFiles.getItems().setAll(files);
@@ -73,8 +67,7 @@ public class MainController implements Initializable, AutoCloseable {
 		File runDir = new File(".");
 		new Thread(() -> {
 			try {
-				networkHandler = new ClientNetworkHandler(this);
-				connect();
+				networkHandler = new ClientNetworkHandler(this, 8072);
 				Platform.runLater(() -> {
 					try {
 						refreshFiles(Files.list(runDir.toPath()).map(Path::toFile)

@@ -1,5 +1,7 @@
 package ru.bulldog.cloudstorage.network.packet;
 
+import io.netty.buffer.ByteBuf;
+
 public class FileRequest extends Packet {
 
 	private final String name;
@@ -11,5 +13,10 @@ public class FileRequest extends Packet {
 
 	public String getName() {
 		return name;
+	}
+
+	@Override
+	public void write(ByteBuf buffer) throws Exception {
+
 	}
 }
