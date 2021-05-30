@@ -13,19 +13,19 @@ public enum ServerCommand {
 
 	private final String name;
 	private final String description;
-	private String data = "";
+	private String arguments = "";
 
 	ServerCommand(String name, String desc) {
 		this.name = name;
 		this.description = desc;
 	}
 
-	public String getData() {
-		return data;
+	public String getArguments() {
+		return arguments;
 	}
 
-	private void setData(String data) {
-		this.data = data.replaceAll(getName() + " ", "");
+	private void setArguments(String arguments) {
+		this.arguments = arguments;
 	}
 
 	public String getName() {
@@ -38,8 +38,10 @@ public enum ServerCommand {
 
 	public static Optional<ServerCommand> of(String data) {
 		for (ServerCommand command : values()) {
-			if (data != null && data.startsWith(command.getName())) {
-				command.setData(data);
+			String commandName = command.getName();
+			if (data != null && data.startsWith(commandName)) {
+				String arguments = data.replaceAll(commandName + " ", "");
+				command.setArguments(arguments);
 				return Optional.of(command);
 			}
 		}

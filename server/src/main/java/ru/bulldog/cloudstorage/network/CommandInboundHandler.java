@@ -9,16 +9,16 @@ import java.io.ByteArrayOutputStream;
 
 public class CommandInboundHandler extends SimpleChannelInboundHandler<ServerCommand> {
 
-	private final ServerNetworkHandler server;
+	private final ServerNetworkHandler networkHandler;
 
-	public CommandInboundHandler(ServerNetworkHandler server) {
-		this.server = server;
+	public CommandInboundHandler(ServerNetworkHandler networkHandler) {
+		this.networkHandler = networkHandler;
 	}
 
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, ServerCommand command) throws Exception {
 		ByteArrayOutputStream response = new ByteArrayOutputStream();
-		server.handleCommand(command, response);
+		networkHandler.handleCommand(command, response);
 		ByteBuf buffer = ctx.alloc().directBuffer();
 		buffer.writeBytes(response.toByteArray());
 		ctx.writeAndFlush(buffer);

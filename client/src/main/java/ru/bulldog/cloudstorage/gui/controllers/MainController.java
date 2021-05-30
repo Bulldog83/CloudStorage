@@ -31,18 +31,10 @@ public class MainController implements Initializable, AutoCloseable {
 	public ListView<String> serverFiles;
 
 	public void sendFile(ActionEvent actionEvent) {
-//		File file = clientFiles.getSelectionModel().getSelectedItem();
-//		if (file != null) {
-//			try {
-//				if (!connection.isConnected()) {
-//					connect();
-//				}
-//				FilePacket packet = new FilePacket(file.toPath());
-//				connection.sendData(packet);
-//			} catch (Exception ex) {
-//				LOGGER.warn(ex.getLocalizedMessage(), ex);
-//			}
-//		}
+		File file = clientFiles.getSelectionModel().getSelectedItem();
+		if (file != null) {
+			networkHandler.sendFile(file.toPath());
+		}
 	}
 
 	public void requestFile(ActionEvent actionEvent) {

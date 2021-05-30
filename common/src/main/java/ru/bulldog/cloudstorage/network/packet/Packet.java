@@ -28,6 +28,10 @@ public abstract class Packet implements Serializable {
 					return Optional.of(new FilesListPacket(buffer));
 				case LIST_REQUEST:
 					return Optional.of(new ListRequest());
+				case FILE:
+					return Optional.of(new FilePacket(buffer));
+				case FILE_REQUEST:
+					return Optional.of(new FileRequest(buffer));
 			}
 		}
 		return Optional.empty();

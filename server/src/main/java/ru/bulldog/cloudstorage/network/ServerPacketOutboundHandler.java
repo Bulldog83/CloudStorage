@@ -3,8 +3,10 @@ package ru.bulldog.cloudstorage.network;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.stream.ChunkedFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 
@@ -18,30 +20,49 @@ public class ServerPacketOutboundHandler extends PacketOutboundHandler {
 
 	private final static Logger logger = LogManager.getLogger(ServerPacketOutboundHandler.class);
 	private final static Path filesDir;
+	private final ServerNetworkHandler networkHandler;
+
+	public ServerPacketOutboundHandler(ServerNetworkHandler networkHandler) {
+		this.networkHandler = networkHandler;
+	}
 
 	@Override
 	public void write0(ChannelHandlerContext ctx, Packet packet, ChannelPromise promise) throws Exception {
 		logger.debug("Received: " + packet.getType());
 		switch (packet.getType()) {
 			case FILES_LIST:
-				handleFilesList(ctx, (FilesListPacket) packet);
+				handleFilesList((FilesListPacket) packet);
 				break;
-			default:
-				ctx.writeAndFlush(packet);
+			case FILE:
+				handleFile(ctx, (FilePacket) packet);
+				return;
 		}
+		ByteBuf buffer = ctx.alloc().buffer();
+		packet.write(buffer);
+		ctx.write(buffer);
 	}
 
-	private void handleFilesList(ChannelHandlerContext ctx, FilesListPacket packet) {
+	private void handleFilesList(FilesListPacket packet) {
 		try {
 			List<String> filesNames = Files.list(filesDir)
 					.map(file -> file.getFileName().toString())
 					.collect(Collectors.toList());
 			packet.addAll(filesNames);
-			ByteBuf buffer = ctx.alloc().buffer();
-			packet.write(buffer);
-			ctx.writeAndFlush(buffer);
 		} catch (Exception ex) {
 			logger.error(ex.getLocalizedMessage(), ex);
+		}
+	}
+
+	private void handleFile(ChannelHandlerContext ctx, FilePacket packet) {
+		if (packet.isEmpty()) return;
+		System.out.println(packet.getFile());
+		try {
+			ByteBuf buffer = ctx.alloc().buffer();
+			packet.write(buffer);
+			ctx.write(buffer);
+			ctx.writeAndFlush(new ChunkedFile(packet.getFile()));
+		} catch (Exception ex) {
+			logger.error("Error send file: " + packet.getFile());
 		}
 	}
 

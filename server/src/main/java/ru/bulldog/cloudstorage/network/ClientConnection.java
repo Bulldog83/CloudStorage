@@ -1,60 +1,56 @@
 package ru.bulldog.cloudstorage.network;
 
+import com.google.common.collect.Queues;
+import io.netty.channel.Channel;
+import io.netty.channel.socket.SocketChannel;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 
+import java.io.File;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.Socket;
-import java.net.SocketException;
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.Queue;
 
 public class ClientConnection implements Connection {
 
-	private final static Logger LOGGER = LogManager.getLogger(ClientConnection.class);
+	private final static Logger logger = LogManager.getLogger(ClientConnection.class);
 
-	private final NetworkHandler server;
-	private final Socket socket;
-	private final ObjectOutputStream outputStream;
-	private final ObjectInputStream inputStream;
+	private final Queue<File> waitingFiles = Queues.newConcurrentLinkedQueue();
+	private final NetworkHandler networkHandler;
+	private final Channel channel;
+	private Path clientFolder;
 
-	public ClientConnection(ServerNetworkHandler server, Socket socket) throws IOException {
-		this.server = server;
-		this.socket = socket;
-		this.outputStream = new ObjectOutputStream(socket.getOutputStream());
-		this.inputStream = new ObjectInputStream(socket.getInputStream());
+	public ClientConnection(ServerNetworkHandler networkHandler, Channel channel) {
+		this.networkHandler = networkHandler;
+		this.channel = channel;
 	}
 
-	public void listen() {
-		new Thread(() -> {
-			try {
-				while (isConnected()) {
-					Packet packet = (Packet) inputStream.readObject();
-					server.handlePacket(this, packet);
-				}
-			} catch (SocketException sEx) {
-				LOGGER.warn(sEx.getLocalizedMessage());
-			} catch (Exception ex) {
-				LOGGER.error(ex.getLocalizedMessage(), ex);
-			}
-		}).start();
+	public boolean isWaitingFile() {
+		return waitingFiles.size() > 0;
 	}
 
+	public Optional<File> getWaitingFile() {
+		return Optional.ofNullable(waitingFiles.poll());
+	}
+
+	public void waitFile(File file) {
+		waitingFiles.add(file);
+	}
+
+	@Override
 	public void sendData(Packet packet) throws IOException {
-		if (isConnected()) {
-			outputStream.writeObject(packet);
-			outputStream.flush();
-		}
+
 	}
 
 	@Override
 	public void close() throws Exception {
-		socket.close();
+		channel.close();
 	}
 
 	@Override
 	public boolean isConnected() {
-		return !socket.isClosed() && socket.isConnected();
+		return channel.isOpen() && channel.isActive();
 	}
 }

@@ -1,12 +1,18 @@
 package ru.bulldog.cloudstorage.network;
 
+import com.google.common.collect.Maps;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.serialization.ClassResolvers;
+import io.netty.handler.codec.serialization.ObjectDecoder;
+import io.netty.handler.codec.serialization.ObjectEncoder;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.command.ServerCommand;
@@ -19,6 +25,7 @@ import ru.bulldog.cloudstorage.network.packet.Packet;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,6 +37,8 @@ public class ServerNetworkHandler implements NetworkHandler {
 	private final static Logger logger = LogManager.getLogger(ServerNetworkHandler.class);
 	private final static byte[] WRONG_COMMAND_BYTES;
 	private final static Path filesDir;
+
+	private final Map<SocketAddress, ClientConnection> activeConnections = Maps.newHashMap();
 
 	private final ServerCommands commands;
 	private final int port;
@@ -50,11 +59,16 @@ public class ServerNetworkHandler implements NetworkHandler {
 						.childHandler(new ChannelInitializer<SocketChannel>() {
 							@Override
 							protected void initChannel(SocketChannel channel) throws Exception {
+								ServerNetworkHandler networkHandler = ServerNetworkHandler.this;
 								channel.pipeline().addLast(
-										new ServerInboundHandler(),
-										new ServerPacketOutboundHandler(),
-										new ServerPacketInboundHandler(),
-										new StringInboundHandler()
+										new ObjectEncoder(),
+										new ChunkedWriteHandler(),
+										new ServerPacketOutboundHandler(networkHandler),
+										new ServerInboundHandler(networkHandler),
+										new ServerPacketInboundHandler(networkHandler),
+										new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
+										new StringInboundHandler(),
+										new CommandInboundHandler(networkHandler)
 								);
 							}
 						});
@@ -76,17 +90,38 @@ public class ServerNetworkHandler implements NetworkHandler {
 		return filesDir;
 	}
 
-	public boolean handleCommand(String data, OutputStream output) {
+	public void register(SocketAddress address, Channel channel) {
+		ClientConnection connection = new ClientConnection(this, channel);
+		activeConnections.put(address, connection);
+	}
+
+	public void disconnect(SocketAddress address) {
+		Optional<ClientConnection> clientConnection = getConnection(address);
+		clientConnection.ifPresent(connection -> {
+			try {
+				if (connection.isConnected()) {
+					connection.close();
+				}
+			} catch (Exception ex) {
+				logger.warn("Error close connection: " + address, ex);
+			}
+			activeConnections.remove(address);
+		});
+	}
+
+	public Optional<ClientConnection> getConnection(SocketAddress address) {
+		return Optional.ofNullable(activeConnections.get(address));
+	}
+
+	public void handleCommand(String data, OutputStream output) {
 		Optional<ServerCommand> command = ServerCommand.of(data);
 		if (command.isPresent()) {
 			try {
 				handleCommand(command.get(), output);
-				return true;
 			} catch (Exception ex) {
 				logger.warn(ex.getMessage(), ex);
 			}
 		}
-		return false;
 	}
 
 	public void handleCommand(ServerCommand command, OutputStream output) throws Exception {
@@ -141,19 +176,6 @@ public class ServerNetworkHandler implements NetworkHandler {
 			logger.error(ex.getLocalizedMessage(), ex);
 		}
 	}
-
-//	private void handleFile(Connection client, FilePacket packet) {
-//		if (!packet.isEmpty()) {
-//			try {
-//				Path output = filesDir.resolve(packet.getName());
-//				byte[] data = packet.getData();
-//				Files.write(output, data, StandardOpenOption.CREATE);
-//				handleListRequest(client);
-//			} catch (Exception ex) {
-//				logger.warn(ex.getLocalizedMessage(), ex);
-//			}
-//		}
-//	}
 
 	@Override
 	public void close() throws Exception {

@@ -11,6 +11,11 @@ public class FileRequest extends Packet {
 		this.name = name;
 	}
 
+	public FileRequest(ByteBuf buffer) {
+		super(PacketType.FILE_REQUEST);
+		this.name = "";
+	}
+
 	public String getName() {
 		return name;
 	}

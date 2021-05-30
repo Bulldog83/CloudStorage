@@ -1,12 +1,14 @@
 package ru.bulldog.cloudstorage.network;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import javafx.application.Platform;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -17,6 +19,7 @@ import ru.bulldog.cloudstorage.network.packet.ListRequest;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -44,9 +47,10 @@ public class ClientNetworkHandler implements NetworkHandler {
 							protected void initChannel(SocketChannel channel) throws Exception {
 								socketChannel = channel;
 								channel.pipeline().addLast(
+										new ChunkedWriteHandler(),
 										new ClientInboundHandler(),
-										new ClientPacketInboundHandler(controller),
-										new ClientPacketOutboundHandler()
+										new ClientPacketOutboundHandler(),
+										new ClientPacketInboundHandler(controller)
 								);
 							}
 						});
@@ -67,38 +71,17 @@ public class ClientNetworkHandler implements NetworkHandler {
 		connectionThread.start();
 	}
 
-
-
-	@Override
-	public void handlePacket(Connection connection, Packet packet) {
-		switch (packet.getType()) {
-			case FILES_LIST:
-				handleFilesList((FilesListPacket) packet);
-				break;
-			case FILE:
-				handleFile((FilePacket) packet);
-				break;
+	public void sendFile(Path file) {
+		try {
+			FilePacket packet = new FilePacket(file);
+			socketChannel.writeAndFlush(packet);
+		} catch (Exception ex) {
+			logger.error("Send file error: " + file, ex);
 		}
 	}
 
-	private void handleFile(FilePacket packet) {
-//		if (!packet.isEmpty()) {
-//			try {
-//				Path output = filesDir.resolve(packet.getName());
-//				byte[] data = packet.getData();
-//				Files.write(output, data, StandardOpenOption.CREATE);
-//				Platform.runLater(() -> {
-//					try {
-//						controller.refreshFiles(Files.list(filesDir).map(Path::toFile)
-//								.collect(Collectors.toList()));
-//					} catch (IOException ex) {
-//						LOGGER.warn(ex.getLocalizedMessage(), ex);
-//					}
-//				});
-//			} catch (Exception ex) {
-//				LOGGER.warn(ex.getLocalizedMessage(), ex);
-//			}
-//		}
+	@Override
+	public void handlePacket(Connection connection, Packet packet) {
 	}
 
 	private void handleFilesList(FilesListPacket packet) {
