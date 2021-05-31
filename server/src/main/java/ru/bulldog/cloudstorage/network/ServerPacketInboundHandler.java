@@ -22,7 +22,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		logger.debug("Received packet: " + packet.getType());
 		switch (packet.getType()) {
 			case LIST_REQUEST:
-				ctx.writeAndFlush(new FilesListPacket());
+				ctx.writeAndFlush(new FilesListPacket(packet.getSession()));
 				break;
 			case FILE_REQUEST:
 				handleFileRequest(ctx, (FileRequest) packet);

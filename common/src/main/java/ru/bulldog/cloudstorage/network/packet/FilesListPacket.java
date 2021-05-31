@@ -1,14 +1,11 @@
 package ru.bulldog.cloudstorage.network.packet;
 
 import com.google.common.collect.Lists;
-import io.netty.buffer.ByteBuf;
 import ru.bulldog.cloudstorage.data.DataBuffer;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 public class FilesListPacket extends Packet {
 

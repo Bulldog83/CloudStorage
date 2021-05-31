@@ -1,6 +1,7 @@
 package ru.bulldog.cloudstorage.network;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.socket.SocketChannel;
@@ -29,17 +30,20 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 
 	@Override
 	public void channelActive(ChannelHandlerContext ctx) throws Exception {
-		SocketAddress address = ctx.channel().remoteAddress();
+		Channel channel = ctx.channel();
+		SocketAddress address = channel.remoteAddress();
 		Session session = networkHandler.register(address, (SocketChannel) ctx.channel());
-		ctx.attr(Session.SESSION_KEY).set(session);
-		ctx.writeAndFlush(new SessionPacket(session.getUUID()));
+		channel.attr(Session.SESSION_KEY).set(session);
+		ctx.write(new SessionPacket(session.getUUID()));
+		ctx.writeAndFlush(new FilesListPacket(session.getUUID()));
 		logger.info("Connected: " + address);
 	}
 
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-		SocketAddress address = ctx.channel().remoteAddress();
-		Session channelSession = ctx.attr(Session.SESSION_KEY).get();
+		Channel channel = ctx.channel();
+		SocketAddress address = channel.remoteAddress();
+		Session channelSession = channel.attr(Session.SESSION_KEY).get();
 		networkHandler.disconnect(address, channelSession);
 		logger.info("Disconnected: " + address);
 	}
@@ -47,7 +51,7 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 		DataBuffer buffer = new DataBuffer((ByteBuf) msg);
-		Optional<Session> channelSession = Optional.ofNullable(ctx.attr(Session.SESSION_KEY).get());
+		Optional<Session> channelSession = Optional.ofNullable(ctx.channel().attr(Session.SESSION_KEY).get());
 		if (channelSession.isPresent()) {
 			Session session = channelSession.get();
 			if (session.isReceiving()) {
@@ -78,8 +82,9 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 
 	@Override
 	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-		SocketAddress address = ctx.channel().remoteAddress();
-		Optional<Session> channelSession = Optional.ofNullable(ctx.attr(Session.SESSION_KEY).get());
+		Channel channel = ctx.channel();
+		SocketAddress address = channel.remoteAddress();
+		Optional<Session> channelSession = Optional.ofNullable(channel.attr(Session.SESSION_KEY).get());
 		channelSession.ifPresent(session -> {
 			if (session.isConnected()) {
 				logger.warn("Handled error: " + address, cause);

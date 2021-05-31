@@ -45,7 +45,7 @@ public class MainController implements Initializable {
 		File file = clientFiles.getSelectionModel().getSelectedItem();
 		if (file != null) {
 			try {
-				FilePacket packet = new FilePacket(sessionId, file.toPath());
+				FilePacket packet = new FilePacket(networkHandler.getSession().getUUID(), file.toPath());
 				networkHandler.sendPacket(packet);
 			} catch (Exception ex) {
 				logger.error("Send file error: " + file, ex);
@@ -57,7 +57,7 @@ public class MainController implements Initializable {
 		String name = serverFiles.getSelectionModel().getSelectedItem();
 		if (name != null) {
 			try {
-				FileRequest packet = new FileRequest(name);
+				FileRequest packet = new FileRequest(networkHandler.getSession().getUUID(), name);
 				networkHandler.sendPacket(packet);
 			} catch (Exception ex) {
 				logger.warn("Request file error: " + name, ex);

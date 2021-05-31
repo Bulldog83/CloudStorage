@@ -23,6 +23,11 @@ public class Session implements AutoCloseable {
 		this.channel = channel;
 	}
 
+	public Session(SocketChannel channel, UUID sessionId) {
+		this.sessionId = sessionId;
+		this.channel = channel;
+	}
+
 	public UUID getUUID() {
 		return sessionId;
 	}

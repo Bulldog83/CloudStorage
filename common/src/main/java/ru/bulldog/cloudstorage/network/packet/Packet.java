@@ -50,6 +50,8 @@ public abstract class Packet implements Serializable {
 					return Optional.of(new FileRequest(buffer));
 				case FILE_PROGRESS:
 					return Optional.of(new FileProgressPacket(buffer));
+				case SESSION:
+					return Optional.of(new SessionPacket(buffer));
 			}
 		}
 		return Optional.empty();

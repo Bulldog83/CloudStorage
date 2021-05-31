@@ -5,6 +5,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.data.DataBuffer;
 import ru.bulldog.cloudstorage.gui.controllers.MainController;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.Packet;
@@ -46,8 +47,8 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-		ByteBuf buffer = (ByteBuf) msg;
-		Session session = networkHandler.getConnection();
+		DataBuffer buffer = new DataBuffer((ByteBuf) msg);
+		Session session = networkHandler.getSession();
 		if (session.isReceiving()) {
 			Optional<ReceivingFile> receivingFile = session.getReceivingFile();
 			receivingFile.ifPresent(file -> {
@@ -58,16 +59,20 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 				}
 			});
 		} else {
-			Optional<Packet> optionalPacket = Packet.read(buffer);
-			if (optionalPacket.isPresent()) {
-				Packet packet = optionalPacket.get();
-				ctx.fireChannelRead(packet);
-				if (packet.getType() == Packet.PacketType.FILE) {
-					buffer.markReaderIndex();
-					handleReceivingFile(session, (FilePacket) packet, buffer);
+			while (buffer.isReadable()) {
+				Optional<Packet> optionalPacket = Packet.read(buffer);
+				if (optionalPacket.isPresent()) {
+					Packet packet = optionalPacket.get();
+					ctx.fireChannelRead(packet);
+					if (packet.getType() == Packet.PacketType.FILE) {
+						buffer.markReaderIndex();
+						handleReceivingFile(session, (FilePacket) packet, buffer);
+						break;
+					}
+				} else{
+					ctx.fireChannelRead(buffer.toString(StandardCharsets.UTF_8));
+					break;
 				}
-			} else {
-				ctx.fireChannelRead(buffer.toString(StandardCharsets.UTF_8));
 			}
 		}
 	}

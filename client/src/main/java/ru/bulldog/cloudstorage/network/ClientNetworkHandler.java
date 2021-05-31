@@ -16,6 +16,7 @@ import ru.bulldog.cloudstorage.network.packet.Packet;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.UUID;
 
 public class ClientNetworkHandler {
 
@@ -40,19 +41,14 @@ public class ClientNetworkHandler {
 								session = new Session(channel);
 								ClientNetworkHandler networkHandler = ClientNetworkHandler.this;
 								channel.pipeline().addLast(
-										new ClientInboundHandler(networkHandler),
 										new ChunkedWriteHandler(),
-										new ClientPacketOutboundHandler(),
-										new ClientPacketInboundHandler(controller)
+										new ClientInboundHandler(networkHandler),
+										new ClientPacketInboundHandler(networkHandler),
+										new ClientPacketOutboundHandler()
 								);
 							}
 						});
 				ChannelFuture channelFuture = bootstrap.connect("localhost", port).sync();
-				channelFuture.addListener(future -> {
-					if (future.isSuccess()) {
-						sendPacket(new ListRequest());
-					}
-				});
 				channelFuture.channel().closeFuture().sync();
 			} catch (Exception ex) {
 				logger.error("Connection error.", ex);
@@ -64,11 +60,15 @@ public class ClientNetworkHandler {
 		connectionThread.start();
 	}
 
+	public void setSession(Session session) {
+		this.session = session;
+	}
+
 	public MainController getController() {
 		return controller;
 	}
 
-	public Session getConnection() {
+	public Session getSession() {
 		return session;
 	}
 
