@@ -22,19 +22,18 @@ public class ServerCommands {
 	public byte[] execute(ServerCommand command) throws Exception {
 		switch (command) {
 			case HALT:
-				server.close();
 				System.exit(0);
 				return success();
 			case LS:
 				return getDirList();
 			case CAT:
-				return getFileData(command.getData());
+				return getFileData(command.getArguments());
 			case READ:
-				return writeString(command.getData());
+				return writeString(command.getArguments());
 			case MKDIR:
-				return makeDir(command.getData());
+				return makeDir(command.getArguments());
 			case TOUCH:
-				return createFile(command.getData());
+				return createFile(command.getArguments());
 			case HELP:
 				return printHelp();
 			default:

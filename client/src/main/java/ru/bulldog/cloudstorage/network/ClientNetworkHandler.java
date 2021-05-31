@@ -1,81 +1,83 @@
 package ru.bulldog.cloudstorage.network;
 
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import javafx.application.Platform;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.gui.controllers.MainController;
+import ru.bulldog.cloudstorage.network.packet.FilePacket;
+import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
+import ru.bulldog.cloudstorage.network.packet.ListRequest;
+import ru.bulldog.cloudstorage.network.packet.Packet;
 
 import java.io.File;
-import java.io.IOException;
-import java.net.Socket;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.List;
-import java.util.stream.Collectors;
 
-public class ClientNetworkHandler implements NetworkHandler {
+public class ClientNetworkHandler {
 
 	private final static Path filesDir;
-	private static final Logger LOGGER = LogManager.getLogger(ClientNetworkHandler.class);
+	private static final Logger logger = LogManager.getLogger(ClientNetworkHandler.class);
 
 	private final MainController controller;
-	private ServerConnection connection;
+	private Connection connection;
 
-	public ClientNetworkHandler(MainController controller) {
+	public ClientNetworkHandler(MainController controller, int port) {
 		this.controller = controller;
+
+		Thread connectionThread = new Thread(() -> {
+			EventLoopGroup worker = new NioEventLoopGroup();
+			try {
+				Bootstrap bootstrap = new Bootstrap();
+				bootstrap.group(worker)
+						.channel(NioSocketChannel.class)
+						.handler(new ChannelInitializer<SocketChannel>() {
+							@Override
+							protected void initChannel(SocketChannel channel) throws Exception {
+								connection = new Connection(channel);
+								ClientNetworkHandler networkHandler = ClientNetworkHandler.this;
+								channel.pipeline().addLast(
+										new ChunkedWriteHandler(),
+										new ClientInboundHandler(networkHandler),
+										new ClientPacketOutboundHandler(),
+										new ClientPacketInboundHandler(controller)
+								);
+							}
+						});
+				ChannelFuture channelFuture = bootstrap.connect("localhost", port).sync();
+				channelFuture.addListener(future -> {
+					if (future.isSuccess()) {
+						sendPacket(new ListRequest());
+					}
+				});
+				channelFuture.channel().closeFuture().sync();
+			} catch (Exception ex) {
+				logger.error("Connection error.", ex);
+			} finally {
+				worker.shutdownGracefully();
+			}
+		});
+		connectionThread.setDaemon(true);
+		connectionThread.start();
 	}
 
-	public ServerConnection getConnection() throws IOException {
-		if (connection != null && connection.isConnected()) {
-			return connection;
-		}
-		Socket socket = new Socket("localhost", 8099);
-		this.connection = new ServerConnection(this, socket);
-		connection.listen();
+	public MainController getController() {
+		return controller;
+	}
+
+	public Connection getConnection() {
 		return connection;
 	}
 
-	@Override
-	public void handlePacket(Connection connection, Packet packet) {
-		switch (packet.getType()) {
-			case FILES_LIST:
-				handleFilesList((FilesListPacket) packet);
-				break;
-			case FILE:
-				handleFile((FilePacket) packet);
-				break;
-		}
-	}
-
-	private void handleFile(FilePacket packet) {
-		if (!packet.isEmpty()) {
-			try {
-				Path output = filesDir.resolve(packet.getName());
-				byte[] data = packet.getData();
-				Files.write(output, data, StandardOpenOption.CREATE);
-				Platform.runLater(() -> {
-					try {
-						controller.refreshFiles(Files.list(filesDir).map(Path::toFile)
-								.collect(Collectors.toList()));
-					} catch (IOException ex) {
-						LOGGER.warn(ex.getLocalizedMessage(), ex);
-					}
-				});
-			} catch (Exception ex) {
-				LOGGER.warn(ex.getLocalizedMessage(), ex);
-			}
-		}
-	}
-
-	private void handleFilesList(FilesListPacket packet) {
-		List<String> names = packet.getNames();
-		Platform.runLater(() -> controller.serverFiles.getItems().setAll(names));
-	}
-
-	@Override
-	public void close() throws Exception {
-		connection.close();
+	public void sendPacket(Packet packet) {
+		connection.sendPacket(packet);
 	}
 
 	static {

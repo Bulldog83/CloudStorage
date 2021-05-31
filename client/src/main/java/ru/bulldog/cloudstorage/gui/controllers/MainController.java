@@ -8,22 +8,23 @@ import javafx.scene.control.ListView;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.network.ClientNetworkHandler;
-import ru.bulldog.cloudstorage.network.FilePacket;
-import ru.bulldog.cloudstorage.network.FileRequest;
-import ru.bulldog.cloudstorage.network.ServerConnection;
+import ru.bulldog.cloudstorage.network.packet.FilePacket;
+import ru.bulldog.cloudstorage.network.packet.FileRequest;
+import ru.bulldog.cloudstorage.network.packet.Packet;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
 
-public class MainController implements Initializable, AutoCloseable {
+public class MainController implements Initializable {
 
-	private final static Logger LOGGER = LogManager.getLogger(MainController.class);
+	private final static Logger logger = LogManager.getLogger(MainController.class);
 
 	@FXML
 	public ListView<File> clientFiles;
@@ -34,13 +35,10 @@ public class MainController implements Initializable, AutoCloseable {
 		File file = clientFiles.getSelectionModel().getSelectedItem();
 		if (file != null) {
 			try {
-				if (!connection.isConnected()) {
-					connect();
-				}
 				FilePacket packet = new FilePacket(file.toPath());
-				connection.sendData(packet);
+				networkHandler.sendPacket(packet);
 			} catch (Exception ex) {
-				LOGGER.warn(ex.getLocalizedMessage(), ex);
+				logger.error("Send file error: " + file, ex);
 			}
 		}
 	}
@@ -50,47 +48,45 @@ public class MainController implements Initializable, AutoCloseable {
 		if (name != null) {
 			try {
 				FileRequest packet = new FileRequest(name);
-				connection.sendData(packet);
+				networkHandler.sendPacket(packet);
 			} catch (Exception ex) {
-				LOGGER.warn(ex.getLocalizedMessage(), ex);
+				logger.warn("Request file error: " + name, ex);
 			}
 		}
 	}
 
 	private ClientNetworkHandler networkHandler;
-	private ServerConnection connection;
+	private Path filesDir;
 
-	private void connect() throws IOException {
-		connection = networkHandler.getConnection();
+	public void refresh() {
+		Platform.runLater(() -> {
+			try {
+				refreshFiles(Files.list(filesDir).map(Path::toFile)
+						.collect(Collectors.toList()));
+			} catch (IOException ex) {
+				logger.error(ex.getMessage(), ex);
+			}
+		});
 	}
 
 	public void refreshFiles(Collection<File> files) {
 		clientFiles.getItems().setAll(files);
 	}
 
-	@Override
-	public void initialize(URL location, ResourceBundle resources) {
-		File runDir = new File(".");
-		new Thread(() -> {
-			try {
-				networkHandler = new ClientNetworkHandler(this);
-				connect();
-				Platform.runLater(() -> {
-					try {
-						refreshFiles(Files.list(runDir.toPath()).map(Path::toFile)
-								.collect(Collectors.toList()));
-					} catch (IOException ex) {
-						LOGGER.error(ex.getLocalizedMessage(), ex);
-					}
-				});
-			} catch (Exception ex) {
-				LOGGER.error(ex.getLocalizedMessage(), ex);
-			}
-		}).start();
+	public Path getFilesDir() {
+		return filesDir;
 	}
 
 	@Override
-	public void close() throws Exception {
-		networkHandler.close();
+	public void initialize(URL location, ResourceBundle resources) {
+		this.filesDir = Paths.get(".");
+		new Thread(() -> {
+			try {
+				networkHandler = new ClientNetworkHandler(this, 8072);
+				refresh();
+			} catch (Exception ex) {
+				logger.error(ex.getMessage(), ex);
+			}
+		}).start();
 	}
 }
