@@ -1,18 +1,20 @@
 package ru.bulldog.cloudstorage.network.packet;
 
-import io.netty.buffer.ByteBuf;
+import ru.bulldog.cloudstorage.data.DataBuffer;
+
+import java.util.UUID;
 
 public class FileProgressPacket extends Packet {
 
 	private final double progress;
 
-	public FileProgressPacket(double progress) {
-		super(PacketType.FILE_PROGRESS);
+	public FileProgressPacket(UUID session, double progress) {
+		super(PacketType.FILE_PROGRESS, session);
 		this.progress = progress;
 	}
 
-	protected FileProgressPacket(ByteBuf buffer) {
-		super(PacketType.FILE_PROGRESS);
+	protected FileProgressPacket(DataBuffer buffer) {
+		super(PacketType.FILE_PROGRESS, buffer);
 		this.progress = buffer.readDouble();
 	}
 
@@ -21,7 +23,7 @@ public class FileProgressPacket extends Packet {
 	}
 
 	@Override
-	public void write(ByteBuf buffer) throws Exception {
+	public void write(DataBuffer buffer) throws Exception {
 		super.write(buffer);
 		buffer.writeDouble(progress);
 	}

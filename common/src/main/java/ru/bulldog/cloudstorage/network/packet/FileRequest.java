@@ -9,17 +9,14 @@ import java.util.UUID;
 public class FileRequest extends Packet {
 
 	private final String name;
-	private final UUID sessionId;
 
-	public FileRequest(UUID sessionId, String name) {
-		super(PacketType.FILE_REQUEST);
-		this.sessionId = sessionId;
+	public FileRequest(UUID session, String name) {
+		super(PacketType.FILE_REQUEST, session);
 		this.name = name;
 	}
 
 	public FileRequest(DataBuffer buffer) {
-		super(PacketType.FILE_REQUEST);
-		this.sessionId = buffer.readUUID();
+		super(PacketType.FILE_REQUEST, buffer);
 		this.name = buffer.readString();
 	}
 
@@ -30,7 +27,6 @@ public class FileRequest extends Packet {
 	@Override
 	public void write(DataBuffer buffer) throws Exception {
 		super.write(buffer);
-		buffer.writeUUID(sessionId);
 		buffer.writeString(name);
 	}
 }

@@ -24,7 +24,7 @@ public class FilePacket extends Packet {
 	}
 
 	protected FilePacket(DataBuffer buffer) {
-		super(PacketType.FILE, buffer.readUUID());
+		super(PacketType.FILE, buffer);
 		this.name = buffer.readString();
 		this.size = buffer.readLong();
 	}

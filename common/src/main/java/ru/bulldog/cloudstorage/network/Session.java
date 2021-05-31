@@ -1,6 +1,8 @@
 package ru.bulldog.cloudstorage.network;
 
 import io.netty.channel.socket.SocketChannel;
+import io.netty.util.Attribute;
+import io.netty.util.AttributeKey;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
 
@@ -8,6 +10,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public class Session implements AutoCloseable {
+
+	public final static AttributeKey<Session> SESSION_KEY = AttributeKey.valueOf("client_session");
 
 	private final UUID sessionId;
 	private final SocketChannel channel;

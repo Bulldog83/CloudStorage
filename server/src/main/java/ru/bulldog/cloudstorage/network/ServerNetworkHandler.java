@@ -80,27 +80,29 @@ public class ServerNetworkHandler {
 		return filesDir;
 	}
 
-	public void register(SocketAddress address, SocketChannel channel) {
+	public Session register(SocketAddress address, SocketChannel channel) {
 		Session session = new Session(channel);
 		activeConnections.put(session.getUUID(), session);
+		return session;
 	}
 
-	public void disconnect(SocketAddress address) {
-		Optional<Session> clientConnection = getConnection(address);
-		clientConnection.ifPresent(connection -> {
+	public void disconnect(SocketAddress address, Session session) {
+		if (session != null) {
 			try {
-				if (connection.isConnected()) {
-					connection.close();
+				if (session.isConnected()) {
+					session.close();
 				}
 			} catch (Exception ex) {
 				logger.warn("Error close connection: " + address, ex);
 			}
-			activeConnections.remove(address);
-		});
+			activeConnections.remove(session.getUUID());
+		} else {
+			logger.warn("Error close connection: " + address + ", session not specified.");
+		}
 	}
 
-	public Optional<Session> getConnection(SocketAddress address) {
-		return Optional.ofNullable(activeConnections.get(address));
+	public Optional<Session> getConnection(UUID sessionId) {
+		return Optional.ofNullable(activeConnections.get(sessionId));
 	}
 
 	public void handleCommand(String data, OutputStream output) {

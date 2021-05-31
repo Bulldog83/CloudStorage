@@ -18,6 +18,11 @@ public abstract class Packet implements Serializable {
 		this.type = type;
 	}
 
+	protected Packet(PacketType type, DataBuffer buffer) {
+		this.session = buffer.readUUID();
+		this.type = type;
+	}
+
 	public UUID getSession() {
 		return session;
 	}
@@ -38,7 +43,7 @@ public abstract class Packet implements Serializable {
 				case FILES_LIST:
 					return Optional.of(new FilesListPacket(buffer));
 				case LIST_REQUEST:
-					return Optional.of(new ListRequest());
+					return Optional.of(new ListRequest(buffer));
 				case FILE:
 					return Optional.of(new FilePacket(buffer));
 				case FILE_REQUEST:
@@ -63,7 +68,7 @@ public abstract class Packet implements Serializable {
 		LIST_REQUEST(13),
 		COMMAND_PACKET(14),
 		FILE_PROGRESS(15),
-		UUID(16),
+		SESSION(16),
 		UNKNOWN(-1);
 
 		private final byte idx;
