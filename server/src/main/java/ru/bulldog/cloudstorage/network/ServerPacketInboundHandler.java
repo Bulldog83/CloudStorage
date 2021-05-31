@@ -5,12 +5,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.network.packet.*;
 
-import java.io.File;
 import java.io.IOException;
-import java.net.SocketAddress;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Optional;
 
 public class ServerPacketInboundHandler extends PacketInboundHandler {
 	private final static Logger logger = LogManager.getLogger(ServerPacketInboundHandler.class);
@@ -39,7 +35,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		Files.list(networkHandler.getFilesDir()).forEach(file -> {
 			try {
 				if (fileName.equals(file.getFileName().toString())) {
-					FilePacket filePacket = new FilePacket(file);
+					FilePacket filePacket = new FilePacket(packet.getSession(), file);
 					ctx.writeAndFlush(filePacket);
 				}
 			} catch (IOException ex) {

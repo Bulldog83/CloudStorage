@@ -16,14 +16,10 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.command.ServerCommand;
 import ru.bulldog.cloudstorage.command.ServerCommands;
-import ru.bulldog.cloudstorage.network.packet.FilePacket;
-import ru.bulldog.cloudstorage.network.packet.FileRequest;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.net.SocketAddress;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -32,7 +28,7 @@ public class ServerNetworkHandler {
 	private final static Logger logger = LogManager.getLogger(ServerNetworkHandler.class);
 	private final static Path filesDir;
 
-	private final Map<SocketAddress, Connection> activeConnections = Maps.newHashMap();
+	private final Map<UUID, Session> activeConnections = Maps.newHashMap();
 
 	private final ServerCommands commands;
 	private final int port;
@@ -85,12 +81,12 @@ public class ServerNetworkHandler {
 	}
 
 	public void register(SocketAddress address, SocketChannel channel) {
-		Connection connection = new Connection(channel);
-		activeConnections.put(address, connection);
+		Session session = new Session(channel);
+		activeConnections.put(session.getUUID(), session);
 	}
 
 	public void disconnect(SocketAddress address) {
-		Optional<Connection> clientConnection = getConnection(address);
+		Optional<Session> clientConnection = getConnection(address);
 		clientConnection.ifPresent(connection -> {
 			try {
 				if (connection.isConnected()) {
@@ -103,7 +99,7 @@ public class ServerNetworkHandler {
 		});
 	}
 
-	public Optional<Connection> getConnection(SocketAddress address) {
+	public Optional<Session> getConnection(SocketAddress address) {
 		return Optional.ofNullable(activeConnections.get(address));
 	}
 

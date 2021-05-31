@@ -1,8 +1,8 @@
 package ru.bulldog.cloudstorage.network;
 
 import io.netty.channel.ChannelHandlerContext;
-import javafx.application.Platform;
 import ru.bulldog.cloudstorage.gui.controllers.MainController;
+import ru.bulldog.cloudstorage.network.packet.FileProgressPacket;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 
@@ -10,7 +10,7 @@ import java.util.List;
 
 public class ClientPacketInboundHandler extends PacketInboundHandler {
 
-	private MainController controller;
+	private final MainController controller;
 
 	public ClientPacketInboundHandler(MainController controller) {
 		this.controller = controller;
@@ -22,11 +22,23 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 			case FILES_LIST:
 				handleFilesList((FilesListPacket) packet);
 				break;
+			case FILE_PROGRESS:
+				handleFileProgress((FileProgressPacket) packet);
+				break;
+		}
+	}
+
+	private void handleFileProgress(FileProgressPacket packet) {
+		double progress = packet.getProgress();
+		if (progress < 1.0) {
+			controller.setClientProgress(progress);
+		} else {
+			controller.resetClientProgress();
 		}
 	}
 
 	private void handleFilesList(FilesListPacket packet) {
 		List<String> names = packet.getNames();
-		Platform.runLater(() -> controller.serverFiles.getItems().setAll(names));
+		controller.refreshServerFiles(names);
 	}
 }

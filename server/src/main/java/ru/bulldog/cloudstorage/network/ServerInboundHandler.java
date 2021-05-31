@@ -6,10 +6,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.socket.SocketChannel;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import ru.bulldog.cloudstorage.network.packet.FilePacket;
-import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
-import ru.bulldog.cloudstorage.network.packet.Packet;
-import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
+import ru.bulldog.cloudstorage.network.packet.*;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -47,14 +44,14 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 		ByteBuf buffer = (ByteBuf) msg;
 		SocketAddress address = ctx.channel().remoteAddress();
-		Optional<Connection> clientConnection = networkHandler.getConnection(address);
+		Optional<Session> clientConnection = networkHandler.getConnection(address);
 		if (clientConnection.isPresent()) {
-			Connection connection = clientConnection.get();
-			if (connection.isReceiving()) {
-				Optional<ReceivingFile> receivingFile = connection.getReceivingFile();
+			Session session = clientConnection.get();
+			if (session.isReceiving()) {
+				Optional<ReceivingFile> receivingFile = session.getReceivingFile();
 				receivingFile.ifPresent(file -> {
 					try {
-						handleReceivingFile(connection, file, buffer);
+						handleReceivingFile(session, file, buffer);
 					} catch (IOException ex) {
 						logger.error("File receive error " + file, ex);
 					}
@@ -66,7 +63,7 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 					ctx.fireChannelRead(packet);
 					if (packet.getType() == Packet.PacketType.FILE) {
 						buffer.markReaderIndex();
-						handleReceivingFile(connection, (FilePacket) packet, buffer);
+						handleReceivingFile(session, (FilePacket) packet, buffer);
 					}
 				} else {
 					buffer.resetReaderIndex();
@@ -79,7 +76,7 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 	@Override
 	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
 		SocketAddress address = ctx.channel().remoteAddress();
-		Optional<Connection> clientConnection = networkHandler.getConnection(address);
+		Optional<Session> clientConnection = networkHandler.getConnection(address);
 		clientConnection.ifPresent(connection -> {
 			if (connection.isConnected()) {
 				logger.warn("Handled error: " + address, cause);
@@ -88,7 +85,7 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 		});
 	}
 
-	private void handleReceivingFile(Connection connection, FilePacket packet, ByteBuf buffer) throws IOException {
+	private void handleReceivingFile(Session session, FilePacket packet, ByteBuf buffer) throws IOException {
 		String fileName = packet.getName();
 		Path filePath = networkHandler.getFilesDir().resolve(fileName);
 		File file = filePath.toFile();
@@ -97,11 +94,11 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 			file.delete();
 		}
 		ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
-		connection.setReceivingFile(receivingFile);
-		handleReceivingFile(connection, receivingFile, buffer);
+		session.setReceivingFile(receivingFile);
+		handleReceivingFile(session, receivingFile, buffer);
 	}
 
-	private void handleReceivingFile(Connection connection, ReceivingFile receivingFile, ByteBuf buffer) throws IOException {
+	private void handleReceivingFile(Session session, ReceivingFile receivingFile, ByteBuf buffer) throws IOException {
 		File file = receivingFile.getFile();
 		try (FileOutputStream fos = new FileOutputStream(file, true)) {
 			FileChannel fileChannel = fos.getChannel();
@@ -109,11 +106,14 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 			while (nioBuffer.hasRemaining()) {
 				receivingFile.receive(nioBuffer.remaining());
 				fileChannel.write(nioBuffer);
+				long received = receivingFile.getReceived();
+				double progress = (double) received / receivingFile.getSize();
+				session.sendPacket(new FileProgressPacket(progress));
 			}
 			if (receivingFile.toReceive() == 0) {
-				connection.fileReceived();
+				session.fileReceived();
 				logger.debug("Received file: " + file);
-				connection.sendPacket(new FilesListPacket());
+				session.sendPacket(new FilesListPacket());
 			}
 		}
 	}
