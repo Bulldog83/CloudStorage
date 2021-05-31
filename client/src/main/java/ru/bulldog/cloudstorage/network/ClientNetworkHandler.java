@@ -1,7 +1,6 @@
 package ru.bulldog.cloudstorage.network;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
@@ -19,22 +18,19 @@ import ru.bulldog.cloudstorage.network.packet.ListRequest;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
-public class ClientNetworkHandler implements NetworkHandler {
+public class ClientNetworkHandler {
 
 	private final static Path filesDir;
 	private static final Logger logger = LogManager.getLogger(ClientNetworkHandler.class);
 
 	private final MainController controller;
-	private SocketChannel socketChannel;
-	private final int port;
+	private Connection connection;
 
 	public ClientNetworkHandler(MainController controller, int port) {
 		this.controller = controller;
-		this.port = port;
 
 		Thread connectionThread = new Thread(() -> {
 			EventLoopGroup worker = new NioEventLoopGroup();
@@ -45,10 +41,11 @@ public class ClientNetworkHandler implements NetworkHandler {
 						.handler(new ChannelInitializer<SocketChannel>() {
 							@Override
 							protected void initChannel(SocketChannel channel) throws Exception {
-								socketChannel = channel;
+								connection = new Connection(channel);
+								ClientNetworkHandler networkHandler = ClientNetworkHandler.this;
 								channel.pipeline().addLast(
 										new ChunkedWriteHandler(),
-										new ClientInboundHandler(),
+										new ClientInboundHandler(networkHandler),
 										new ClientPacketOutboundHandler(),
 										new ClientPacketInboundHandler(controller)
 								);
@@ -57,7 +54,7 @@ public class ClientNetworkHandler implements NetworkHandler {
 				ChannelFuture channelFuture = bootstrap.connect("localhost", port).sync();
 				channelFuture.addListener(future -> {
 					if (future.isSuccess()) {
-						socketChannel.writeAndFlush(new ListRequest());
+						sendPacket(new ListRequest());
 					}
 				});
 				channelFuture.channel().closeFuture().sync();
@@ -71,27 +68,16 @@ public class ClientNetworkHandler implements NetworkHandler {
 		connectionThread.start();
 	}
 
-	public void sendFile(Path file) {
-		try {
-			FilePacket packet = new FilePacket(file);
-			socketChannel.writeAndFlush(packet);
-		} catch (Exception ex) {
-			logger.error("Send file error: " + file, ex);
-		}
+	public MainController getController() {
+		return controller;
 	}
 
-	@Override
-	public void handlePacket(Connection connection, Packet packet) {
+	public Connection getConnection() {
+		return connection;
 	}
 
-	private void handleFilesList(FilesListPacket packet) {
-		List<String> names = packet.getNames();
-		Platform.runLater(() -> controller.serverFiles.getItems().setAll(names));
-	}
-
-	@Override
-	public void close() throws Exception {
-
+	public void sendPacket(Packet packet) {
+		connection.sendPacket(packet);
 	}
 
 	static {

@@ -55,7 +55,6 @@ public class ServerPacketOutboundHandler extends PacketOutboundHandler {
 
 	private void handleFile(ChannelHandlerContext ctx, FilePacket packet) {
 		if (packet.isEmpty()) return;
-		System.out.println(packet.getFile());
 		try {
 			ByteBuf buffer = ctx.alloc().buffer();
 			packet.write(buffer);

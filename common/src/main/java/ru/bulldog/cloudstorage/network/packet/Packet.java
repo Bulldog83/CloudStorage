@@ -18,7 +18,9 @@ public abstract class Packet implements Serializable {
 		return type;
 	}
 
-	public abstract void write(ByteBuf buffer) throws Exception;
+	public void write(ByteBuf buffer) throws Exception {
+		buffer.writeByte(type.getIdx());
+	}
 
 	public static Optional<Packet> read(ByteBuf buffer) {
 		PacketType packetType = getType(buffer.readByte());

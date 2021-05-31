@@ -2,7 +2,6 @@ package ru.bulldog.cloudstorage.network;
 
 import com.google.common.collect.Maps;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
@@ -19,26 +18,21 @@ import ru.bulldog.cloudstorage.command.ServerCommand;
 import ru.bulldog.cloudstorage.command.ServerCommands;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.FileRequest;
-import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
-import ru.bulldog.cloudstorage.network.packet.Packet;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.SocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 
-public class ServerNetworkHandler implements NetworkHandler {
+public class ServerNetworkHandler {
 
 	private final static Logger logger = LogManager.getLogger(ServerNetworkHandler.class);
-	private final static byte[] WRONG_COMMAND_BYTES;
 	private final static Path filesDir;
 
-	private final Map<SocketAddress, ClientConnection> activeConnections = Maps.newHashMap();
+	private final Map<SocketAddress, Connection> activeConnections = Maps.newHashMap();
 
 	private final ServerCommands commands;
 	private final int port;
@@ -90,13 +84,13 @@ public class ServerNetworkHandler implements NetworkHandler {
 		return filesDir;
 	}
 
-	public void register(SocketAddress address, Channel channel) {
-		ClientConnection connection = new ClientConnection(this, channel);
+	public void register(SocketAddress address, SocketChannel channel) {
+		Connection connection = new Connection(channel);
 		activeConnections.put(address, connection);
 	}
 
 	public void disconnect(SocketAddress address) {
-		Optional<ClientConnection> clientConnection = getConnection(address);
+		Optional<Connection> clientConnection = getConnection(address);
 		clientConnection.ifPresent(connection -> {
 			try {
 				if (connection.isConnected()) {
@@ -109,7 +103,7 @@ public class ServerNetworkHandler implements NetworkHandler {
 		});
 	}
 
-	public Optional<ClientConnection> getConnection(SocketAddress address) {
+	public Optional<Connection> getConnection(SocketAddress address) {
 		return Optional.ofNullable(activeConnections.get(address));
 	}
 
@@ -131,63 +125,11 @@ public class ServerNetworkHandler implements NetworkHandler {
 		}
 	}
 
-	@Override
-	public void handlePacket(Connection client, Packet packet) {
-		switch (packet.getType()) {
-			case FILE:
-				//handleFile(client, (FilePacket) packet);
-				break;
-			case FILE_REQUEST:
-				handleFileRequest(client, (FileRequest) packet);
-				break;
-			case LIST_REQUEST:
-				handleListRequest(client);
-				break;
-		}
-	}
-
-	private void handleListRequest(Connection client) {
-		try {
-			List<String> filesNames = Files.list(filesDir)
-					.map(file -> file.getFileName().toString())
-					.collect(Collectors.toList());
-			FilesListPacket listPacket = new FilesListPacket();
-			listPacket.addAll(filesNames);
-			client.sendData(listPacket);
-		} catch (Exception ex) {
-			logger.error(ex.getLocalizedMessage(), ex);
-		}
-	}
-
-	private void handleFileRequest(Connection client, FileRequest packet) {
-		try {
-			String fileName = packet.getName();
-			Files.list(filesDir).forEach(file -> {
-				try {
-					if (fileName.equals(file.getFileName().toString())) {
-						FilePacket filePacket = new FilePacket(file);
-						client.sendData(filePacket);
-					}
-				} catch (IOException ex) {
-					logger.error(ex.getLocalizedMessage(), ex);
-				}
-			});
-		} catch (Exception ex) {
-			logger.error(ex.getLocalizedMessage(), ex);
-		}
-	}
-
-	@Override
-	public void close() throws Exception {
-
-	}
-
 	static {
 		File dirFiles = new File("files");
 		if (!dirFiles.exists() && !dirFiles.mkdirs()) {
 			logger.error("Can't create files dir.");
 		}
 		filesDir = dirFiles.toPath();
-		WRONG_COMMAND_BYTES = "Unknown command.\n\r".getBytes(StandardCharsets.UTF_8);
 	}
 }

@@ -42,7 +42,7 @@ public class FilePacket extends Packet {
 
 	@Override
 	public void write(ByteBuf buffer) throws Exception {
-		buffer.writeByte(type.getIdx());
+		super.write(buffer);
 		buffer.writeInt(name.length());
 		buffer.writeBytes(name.getBytes(StandardCharsets.UTF_8));
 		buffer.writeLong(size);

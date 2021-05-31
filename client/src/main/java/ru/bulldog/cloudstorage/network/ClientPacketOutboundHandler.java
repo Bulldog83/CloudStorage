@@ -21,6 +21,8 @@ public class ClientPacketOutboundHandler extends PacketOutboundHandler {
 			case FILE:
 				handleFile(ctx, (FilePacket) packet);
 				return;
+			case FILE_REQUEST:
+				break;
 		}
 		ByteBuf buffer = ctx.alloc().buffer();
 		packet.write(buffer);

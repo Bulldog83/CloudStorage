@@ -39,8 +39,8 @@ public class FilesListPacket extends Packet {
 
 	@Override
 	public void write(ByteBuf buffer) throws Exception {
+		super.write(buffer);
 		String names = String.join(delimiter, this.names);
-		buffer.writeByte(type.getIdx());
 		buffer.writeInt(names.length());
 		buffer.writeBytes(names.getBytes(StandardCharsets.UTF_8));
 	}

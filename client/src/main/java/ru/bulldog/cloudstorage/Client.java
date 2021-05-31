@@ -20,15 +20,14 @@ public class Client extends Application {
 	public void start(Stage primaryStage) throws Exception {
 		URL mainFXML = getClass().getResource("fxml/main_window.fxml");
 		FXMLLoader loader = new FXMLLoader(mainFXML);
-		try(MainController ignored = loader.getController()) {
-			Parent root = loader.load();
-			Scene mainWin = new Scene(root);
-			primaryStage.setScene(mainWin);
-			primaryStage.setOnCloseRequest(event -> {
-				Platform.exit();
-				System.exit(0);
-			});
-			primaryStage.show();
-		}
+		Parent root = loader.load();
+		Scene mainWin = new Scene(root);
+		primaryStage.setScene(mainWin);
+		primaryStage.setOnCloseRequest(event -> {
+			Platform.exit();
+			System.exit(0);
+		});
+		primaryStage.setTitle("CloudStorage");
+		primaryStage.show();
 	}
 }
