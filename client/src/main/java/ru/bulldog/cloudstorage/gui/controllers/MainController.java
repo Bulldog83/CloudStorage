@@ -24,7 +24,7 @@ import java.util.Collection;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
 
-public class MainController implements Initializable {
+public class MainController implements Initializable, AutoCloseable {
 
 	private final static Logger logger = LogManager.getLogger(MainController.class);
 
@@ -45,7 +45,7 @@ public class MainController implements Initializable {
 		File file = clientFiles.getSelectionModel().getSelectedItem();
 		if (file != null) {
 			try {
-				FilePacket packet = new FilePacket(networkHandler.getSession().getUUID(), file.toPath());
+				FilePacket packet = new FilePacket(networkHandler.getConnection().getUUID(), file.toPath());
 				networkHandler.sendPacket(packet);
 			} catch (Exception ex) {
 				logger.error("Send file error: " + file, ex);
@@ -57,7 +57,7 @@ public class MainController implements Initializable {
 		String name = serverFiles.getSelectionModel().getSelectedItem();
 		if (name != null) {
 			try {
-				FileRequest packet = new FileRequest(networkHandler.getSession().getUUID(), name);
+				FileRequest packet = new FileRequest(networkHandler.getConnection().getUUID(), name);
 				networkHandler.sendPacket(packet);
 			} catch (Exception ex) {
 				logger.warn("Request file error: " + name, ex);
@@ -136,11 +136,18 @@ public class MainController implements Initializable {
 		clientPath.setText(filesDir.toString());
 		new Thread(() -> {
 			try {
-				networkHandler = new ClientNetworkHandler(this, 8072);
+				networkHandler = new ClientNetworkHandler(this);
 				refreshClientFiles();
 			} catch (Exception ex) {
 				logger.error(ex.getMessage(), ex);
 			}
 		}).start();
+	}
+
+	@Override
+	public void close() throws Exception {
+		networkHandler.getConnection().close();
+		Platform.exit();
+		System.exit(0);
 	}
 }

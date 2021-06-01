@@ -42,22 +42,22 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 		super.channelInactive(ctx);
 		SocketAddress address = ctx.channel().remoteAddress();
-		logger.info("Disconnected: " + address);
+		logger.info("Disconnected from: " + address);
 	}
 
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 		DataBuffer buffer = new DataBuffer((ByteBuf) msg);
-		Session session = networkHandler.getSession();
-		if (session.isReceiving()) {
-			Optional<ReceivingFile> receivingFile = session.getReceivingFile();
-			receivingFile.ifPresent(file -> {
-				try {
-					handleReceivingFile(session, file, buffer);
-				} catch (IOException ex) {
-					logger.error("File receive error " + file, ex);
-				}
-			});
+		Connection connection = networkHandler.getConnection();
+		if (connection.isFileConnection()) {
+//			Optional<ReceivingFile> receivingFile = connection.getReceivingFile();
+//			receivingFile.ifPresent(file -> {
+//				try {
+//					handleReceivingFile(connection, file, buffer);
+//				} catch (IOException ex) {
+//					logger.error("File receive error " + file, ex);
+//				}
+//			});
 		} else {
 			while (buffer.isReadable()) {
 				Optional<Packet> optionalPacket = Packet.read(buffer);
@@ -66,7 +66,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 					ctx.fireChannelRead(packet);
 					if (packet.getType() == Packet.PacketType.FILE) {
 						buffer.markReaderIndex();
-						handleReceivingFile(session, (FilePacket) packet, buffer);
+						handleReceivingFile(connection, (FilePacket) packet, buffer);
 						break;
 					}
 				} else{
@@ -77,7 +77,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 		}
 	}
 
-	private void handleReceivingFile(Session session, FilePacket packet, ByteBuf buffer) throws IOException {
+	private void handleReceivingFile(Connection connection, FilePacket packet, ByteBuf buffer) throws IOException {
 		String fileName = packet.getName();
 		Path filePath = networkHandler.getController().getFilesDir().resolve(fileName);
 		File file = filePath.toFile();
@@ -86,11 +86,11 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 			file.delete();
 		}
 		ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
-		session.setReceivingFile(receivingFile);
-		handleReceivingFile(session, receivingFile, buffer);
+		//connection.setReceivingFile(receivingFile);
+		handleReceivingFile(connection, receivingFile, buffer);
 	}
 
-	private void handleReceivingFile(Session session, ReceivingFile receivingFile, ByteBuf buffer) throws IOException {
+	private void handleReceivingFile(Connection connection, ReceivingFile receivingFile, ByteBuf buffer) throws IOException {
 		File file = receivingFile.getFile();
 		try (FileOutputStream fos = new FileOutputStream(file, true)) {
 			FileChannel fileChannel = fos.getChannel();
@@ -104,7 +104,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 				controller.setServerProgress(progress);
 			}
 			if (receivingFile.toReceive() == 0) {
-				session.fileReceived();
+				//connection.fileReceived();
 				logger.debug("Received file: " + file);
 				controller.resetServerProgress();
 				controller.refreshClientFiles();

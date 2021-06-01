@@ -14,8 +14,7 @@ public class Server {
 	public static void main(String[] args) {
 		Properties properties = System.getProperties();
 		int port = (int) properties.getOrDefault("server.port", 8072);
-		try {
-			ServerNetworkHandler networkHandler = new ServerNetworkHandler(port);
+		try(ServerNetworkHandler networkHandler = new ServerNetworkHandler(port)) {
 			networkHandler.start();
 			Scanner console = new Scanner(System.in);
 			while (true) {
@@ -25,7 +24,7 @@ public class Server {
 				}
 			}
 		} catch (Exception ex) {
-			LOGGER.error(ex.getLocalizedMessage(), ex);
+			LOGGER.error("Server error", ex);
 		}
 	}
 }

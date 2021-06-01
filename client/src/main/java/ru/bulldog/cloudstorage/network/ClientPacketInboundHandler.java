@@ -4,14 +4,12 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import ru.bulldog.cloudstorage.gui.controllers.MainController;
 import ru.bulldog.cloudstorage.network.packet.FileProgressPacket;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 import ru.bulldog.cloudstorage.network.packet.SessionPacket;
 
 import java.util.List;
-import java.util.UUID;
 
 public class ClientPacketInboundHandler extends PacketInboundHandler {
 
@@ -40,8 +38,8 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 	}
 
 	private void handleSessionPacket(ChannelHandlerContext ctx, SessionPacket packet) {
-		Session session = new Session((SocketChannel) ctx.channel(), packet.getSession());
-		networkHandler.setSession(session);
+		Connection connection = new Connection((SocketChannel) ctx.channel(), packet.getSession());
+		networkHandler.setSession(connection);
 	}
 
 	private void handleFileProgress(FileProgressPacket packet) {

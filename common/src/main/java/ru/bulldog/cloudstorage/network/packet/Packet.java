@@ -11,20 +11,9 @@ import java.util.UUID;
 public abstract class Packet implements Serializable {
 
 	protected final PacketType type;
-	protected final UUID session;
 
-	protected Packet(PacketType type, UUID session) {
-		this.session = session;
+	protected Packet(PacketType type) {
 		this.type = type;
-	}
-
-	protected Packet(PacketType type, DataBuffer buffer) {
-		this.session = buffer.readUUID();
-		this.type = type;
-	}
-
-	public UUID getSession() {
-		return session;
 	}
 
 	public PacketType getType() {
@@ -33,7 +22,6 @@ public abstract class Packet implements Serializable {
 
 	public void write(DataBuffer buffer) throws Exception {
 		buffer.writeByte(type.getIdx());
-		buffer.writeUUID(session);
 	}
 
 	public static Optional<Packet> read(DataBuffer buffer) {

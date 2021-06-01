@@ -6,11 +6,25 @@ import java.util.UUID;
 
 public class SessionPacket extends Packet {
 
+	private final UUID session;
+
 	public SessionPacket(UUID uuid) {
-		super(PacketType.SESSION, uuid);
+		super(PacketType.SESSION);
+		this.session = uuid;
 	}
 
-	public SessionPacket(DataBuffer buffer) {
-		super(PacketType.SESSION, buffer);
+	protected SessionPacket(DataBuffer buffer) {
+		super(PacketType.SESSION);
+		this.session = buffer.readUUID();
+	}
+
+	public UUID getSession() {
+		return session;
+	}
+
+	@Override
+	public void write(DataBuffer buffer) throws Exception {
+		super.write(buffer);
+		buffer.writeUUID(session);
 	}
 }

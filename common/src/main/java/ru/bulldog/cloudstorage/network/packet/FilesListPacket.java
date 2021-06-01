@@ -5,7 +5,6 @@ import ru.bulldog.cloudstorage.data.DataBuffer;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 
 public class FilesListPacket extends Packet {
 
@@ -13,12 +12,12 @@ public class FilesListPacket extends Packet {
 
 	private List<String> names = Lists.newArrayList();
 
-	public FilesListPacket(UUID session) {
-		super(PacketType.FILES_LIST, session);
+	public FilesListPacket() {
+		super(PacketType.FILES_LIST);
 	}
 
 	protected FilesListPacket(DataBuffer buffer) {
-		super(PacketType.FILES_LIST, buffer);
+		super(PacketType.FILES_LIST);
 		String names = buffer.readString();
 		this.names = Lists.newArrayList(names.split(delimiter));
 	}

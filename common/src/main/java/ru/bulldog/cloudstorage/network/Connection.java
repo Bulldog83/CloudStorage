@@ -1,7 +1,6 @@
 package ru.bulldog.cloudstorage.network;
 
 import io.netty.channel.socket.SocketChannel;
-import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
@@ -9,23 +8,25 @@ import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
 import java.util.Optional;
 import java.util.UUID;
 
-public class Session implements AutoCloseable {
+public class Connection implements AutoCloseable {
 
-	public final static AttributeKey<Session> SESSION_KEY = AttributeKey.valueOf("client_session");
+	public final static AttributeKey<Connection> SESSION_KEY = AttributeKey.valueOf("client_session");
 
-	private final UUID sessionId;
+	protected final UUID sessionId;
 	private final SocketChannel channel;
-	private FileChannel fileChannel;
-	private ReceivingFile receivingFile;
 
-	public Session(SocketChannel channel) {
+	public Connection(SocketChannel channel) {
 		this.sessionId = UUID.randomUUID();
 		this.channel = channel;
 	}
 
-	public Session(SocketChannel channel, UUID sessionId) {
+	public Connection(SocketChannel channel, UUID sessionId) {
 		this.sessionId = sessionId;
 		this.channel = channel;
+	}
+
+	protected SocketChannel getChannel() {
+		return channel;
 	}
 
 	public UUID getUUID() {
@@ -36,24 +37,16 @@ public class Session implements AutoCloseable {
 		channel.writeAndFlush(packet);
 	}
 
-	public Optional<ReceivingFile> getReceivingFile() {
-		return Optional.ofNullable(receivingFile);
-	}
-
-	public boolean isReceiving() {
-		return receivingFile != null;
-	}
-
-	public void setReceivingFile(ReceivingFile file) {
-		this.receivingFile = file;
-	}
-
-	public void fileReceived() {
-		this.receivingFile = null;
+	public void sendMessage(String message) {
+		channel.writeAndFlush(message);
 	}
 
 	public boolean isConnected() {
 		return channel.isOpen() && channel.isActive();
+	}
+
+	public boolean isFileConnection() {
+		return false;
 	}
 
 	@Override

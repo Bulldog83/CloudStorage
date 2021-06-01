@@ -2,19 +2,17 @@ package ru.bulldog.cloudstorage.network.packet;
 
 import ru.bulldog.cloudstorage.data.DataBuffer;
 
-import java.util.UUID;
-
 public class FileProgressPacket extends Packet {
 
 	private final double progress;
 
-	public FileProgressPacket(UUID session, double progress) {
-		super(PacketType.FILE_PROGRESS, session);
+	public FileProgressPacket(double progress) {
+		super(PacketType.FILE_PROGRESS);
 		this.progress = progress;
 	}
 
 	protected FileProgressPacket(DataBuffer buffer) {
-		super(PacketType.FILE_PROGRESS, buffer);
+		super(PacketType.FILE_PROGRESS);
 		this.progress = buffer.readDouble();
 	}
 
