@@ -8,55 +8,46 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.stream.ChunkedWriteHandler;
-import javafx.application.Platform;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.gui.controllers.MainController;
-import ru.bulldog.cloudstorage.network.packet.FilePacket;
-import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
-import ru.bulldog.cloudstorage.network.packet.ListRequest;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 
-import java.io.File;
-import java.nio.file.Path;
-import java.util.List;
+import java.util.Properties;
 
 public class ClientNetworkHandler {
 
-	private final static Path filesDir;
 	private static final Logger logger = LogManager.getLogger(ClientNetworkHandler.class);
+	private final static String host;
+	private final static int port;
 
 	private final MainController controller;
+	private final Bootstrap bootstrap;
 	private Connection connection;
 
-	public ClientNetworkHandler(MainController controller, int port) {
+	public ClientNetworkHandler(MainController controller) {
 		this.controller = controller;
-
-		Thread connectionThread = new Thread(() -> {
-			EventLoopGroup worker = new NioEventLoopGroup();
-			try {
-				Bootstrap bootstrap = new Bootstrap();
-				bootstrap.group(worker)
-						.channel(NioSocketChannel.class)
-						.handler(new ChannelInitializer<SocketChannel>() {
-							@Override
-							protected void initChannel(SocketChannel channel) throws Exception {
-								connection = new Connection(channel);
-								ClientNetworkHandler networkHandler = ClientNetworkHandler.this;
-								channel.pipeline().addLast(
-										new ChunkedWriteHandler(),
-										new ClientInboundHandler(networkHandler),
-										new ClientPacketOutboundHandler(),
-										new ClientPacketInboundHandler(controller)
-								);
-							}
-						});
-				ChannelFuture channelFuture = bootstrap.connect("localhost", port).sync();
-				channelFuture.addListener(future -> {
-					if (future.isSuccess()) {
-						sendPacket(new ListRequest());
+		this.bootstrap = new Bootstrap();
+		EventLoopGroup worker = new NioEventLoopGroup();
+		bootstrap.group(worker)
+				.channel(NioSocketChannel.class)
+				.remoteAddress(host, port)
+				.handler(new ChannelInitializer<SocketChannel>() {
+					@Override
+					protected void initChannel(SocketChannel channel) throws Exception {
+						connection = new Connection(channel);
+						ClientNetworkHandler networkHandler = ClientNetworkHandler.this;
+						channel.pipeline().addLast(
+								new ChunkedWriteHandler(),
+								new ClientInboundHandler(networkHandler),
+								new ClientPacketInboundHandler(networkHandler),
+								new ClientPacketOutboundHandler()
+						);
 					}
 				});
+		Thread connectionThread = new Thread(() -> {
+			try {
+				ChannelFuture channelFuture = bootstrap.connect().sync();
 				channelFuture.channel().closeFuture().sync();
 			} catch (Exception ex) {
 				logger.error("Connection error.", ex);
@@ -66,6 +57,14 @@ public class ClientNetworkHandler {
 		});
 		connectionThread.setDaemon(true);
 		connectionThread.start();
+	}
+
+	public void openFileChannel() {
+
+	}
+
+	public void setSession(Connection connection) {
+		this.connection = connection;
 	}
 
 	public MainController getController() {
@@ -81,7 +80,8 @@ public class ClientNetworkHandler {
 	}
 
 	static {
-		File dirFiles = new File(".");
-		filesDir = dirFiles.toPath();
+		Properties properties = System.getProperties();
+		host = properties.getProperty("server.host", "localhost");
+		port = (int) properties.getOrDefault("server.port", 8072);
 	}
 }

@@ -1,22 +1,28 @@
 package ru.bulldog.cloudstorage.network.packet;
 
-import io.netty.buffer.ByteBuf;
+import ru.bulldog.cloudstorage.data.DataBuffer;
 
-import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 public class FileRequest extends Packet {
 
+	private final UUID session;
 	private final String name;
 
-	public FileRequest(String name) {
+	public FileRequest(UUID session, String name) {
 		super(PacketType.FILE_REQUEST);
+		this.session = session;
 		this.name = name;
 	}
 
-	public FileRequest(ByteBuf buffer) {
+	public FileRequest(DataBuffer buffer) {
 		super(PacketType.FILE_REQUEST);
-		int len = buffer.readInt();
-		this.name = buffer.readCharSequence(len , StandardCharsets.UTF_8).toString();
+		this.session = buffer.readUUID();
+		this.name = buffer.readString();
+	}
+
+	public UUID getSession() {
+		return session;
 	}
 
 	public String getName() {
@@ -24,9 +30,9 @@ public class FileRequest extends Packet {
 	}
 
 	@Override
-	public void write(ByteBuf buffer) throws Exception {
+	public void write(DataBuffer buffer) throws Exception {
 		super.write(buffer);
-		buffer.writeInt(name.length());
-		buffer.writeBytes(name.getBytes(StandardCharsets.UTF_8));
+		buffer.writeUUID(session)
+			  .writeString(name);
 	}
 }

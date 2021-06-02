@@ -1,32 +1,58 @@
 package ru.bulldog.cloudstorage.network;
 
 import io.netty.channel.ChannelHandlerContext;
-import javafx.application.Platform;
-import ru.bulldog.cloudstorage.gui.controllers.MainController;
+import io.netty.channel.socket.SocketChannel;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.network.packet.FileProgressPacket;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 import ru.bulldog.cloudstorage.network.packet.Packet;
+import ru.bulldog.cloudstorage.network.packet.SessionPacket;
 
 import java.util.List;
 
 public class ClientPacketInboundHandler extends PacketInboundHandler {
 
-	private MainController controller;
+	private final static Logger logger = LogManager.getLogger(ClientPacketInboundHandler.class);
 
-	public ClientPacketInboundHandler(MainController controller) {
-		this.controller = controller;
+	private final ClientNetworkHandler networkHandler;
+
+	public ClientPacketInboundHandler(ClientNetworkHandler networkHandler) {
+		this.networkHandler = networkHandler;
 	}
 
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, Packet packet) throws Exception {
+		logger.debug("Received packet: " + packet.getType());
 		switch (packet.getType()) {
 			case FILES_LIST:
 				handleFilesList((FilesListPacket) packet);
 				break;
+			case FILE_PROGRESS:
+				handleFileProgress((FileProgressPacket) packet);
+				break;
+			case SESSION:
+				handleSessionPacket(ctx, (SessionPacket) packet);
+				break;
+		}
+	}
+
+	private void handleSessionPacket(ChannelHandlerContext ctx, SessionPacket packet) {
+		Connection connection = new Connection((SocketChannel) ctx.channel(), packet.getSession());
+		networkHandler.setSession(connection);
+	}
+
+	private void handleFileProgress(FileProgressPacket packet) {
+		double progress = packet.getProgress();
+		if (progress < 1.0) {
+			networkHandler.getController().setClientProgress(progress);
+		} else {
+			networkHandler.getController().resetClientProgress();
 		}
 	}
 
 	private void handleFilesList(FilesListPacket packet) {
 		List<String> names = packet.getNames();
-		Platform.runLater(() -> controller.serverFiles.getItems().setAll(names));
+		networkHandler.getController().refreshServerFiles(names);
 	}
 }

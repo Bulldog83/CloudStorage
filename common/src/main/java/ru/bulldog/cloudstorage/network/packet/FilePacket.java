@@ -1,31 +1,40 @@
 package ru.bulldog.cloudstorage.network.packet;
 
 import io.netty.buffer.ByteBuf;
+import ru.bulldog.cloudstorage.data.DataBuffer;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.UUID;
 
 public class FilePacket extends Packet {
 
+	private final UUID session;
 	private final String name;
 	private final long size;
+	private ByteBuf buffer;
 	private File file;
 
-	public FilePacket(Path file) throws IOException {
+	public FilePacket(UUID sessionId, Path file) throws IOException {
 		super(PacketType.FILE);
+		this.session = sessionId;
 		this.name = file.getFileName().toString();
 		this.size = Files.size(file);
 		this.file = file.toFile();
 	}
 
-	protected FilePacket(ByteBuf buffer) {
+	protected FilePacket(DataBuffer buffer) {
 		super(PacketType.FILE);
-		int len = buffer.readInt();
-		this.name = buffer.readCharSequence(len, StandardCharsets.UTF_8).toString();
+		this.session = buffer.readUUID();
+		this.name = buffer.readString();
 		this.size = buffer.readLong();
+		this.buffer = buffer;
+	}
+
+	public UUID getSession() {
+		return session;
 	}
 
 	public String getName() {
@@ -40,12 +49,16 @@ public class FilePacket extends Packet {
 		return file;
 	}
 
+	public ByteBuf getBuffer() {
+		return buffer;
+	}
+
 	@Override
-	public void write(ByteBuf buffer) throws Exception {
+	public void write(DataBuffer buffer) throws Exception {
 		super.write(buffer);
-		buffer.writeInt(name.length());
-		buffer.writeBytes(name.getBytes(StandardCharsets.UTF_8));
-		buffer.writeLong(size);
+		buffer.writeUUID(session)
+			  .writeString(name)
+			  .writeLong(size);
 	}
 
 	public boolean isEmpty() {

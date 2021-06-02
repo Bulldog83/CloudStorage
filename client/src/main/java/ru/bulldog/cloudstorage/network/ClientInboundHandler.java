@@ -5,8 +5,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.data.DataBuffer;
+import ru.bulldog.cloudstorage.gui.controllers.MainController;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
-import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
 
@@ -41,33 +42,37 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 		super.channelInactive(ctx);
 		SocketAddress address = ctx.channel().remoteAddress();
-		logger.info("Disconnected: " + address);
+		logger.info("Disconnected from: " + address);
 	}
 
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-		ByteBuf buffer = (ByteBuf) msg;
+		DataBuffer buffer = new DataBuffer((ByteBuf) msg);
 		Connection connection = networkHandler.getConnection();
-		if (connection.isReceiving()) {
-			Optional<ReceivingFile> receivingFile = connection.getReceivingFile();
-			receivingFile.ifPresent(file -> {
-				try {
-					handleReceivingFile(connection, file, buffer);
-				} catch (IOException ex) {
-					logger.error("File receive error " + file, ex);
-				}
-			});
+		if (connection.isFileConnection()) {
+//			Optional<ReceivingFile> receivingFile = connection.getReceivingFile();
+//			receivingFile.ifPresent(file -> {
+//				try {
+//					handleReceivingFile(connection, file, buffer);
+//				} catch (IOException ex) {
+//					logger.error("File receive error " + file, ex);
+//				}
+//			});
 		} else {
-			Optional<Packet> optionalPacket = Packet.read(buffer);
-			if (optionalPacket.isPresent()) {
-				Packet packet = optionalPacket.get();
-				ctx.fireChannelRead(packet);
-				if (packet.getType() == Packet.PacketType.FILE) {
-					buffer.markReaderIndex();
-					handleReceivingFile(connection, (FilePacket) packet, buffer);
+			while (buffer.isReadable()) {
+				Optional<Packet> optionalPacket = Packet.read(buffer);
+				if (optionalPacket.isPresent()) {
+					Packet packet = optionalPacket.get();
+					ctx.fireChannelRead(packet);
+					if (packet.getType() == Packet.PacketType.FILE) {
+						buffer.markReaderIndex();
+						handleReceivingFile(connection, (FilePacket) packet, buffer);
+						break;
+					}
+				} else{
+					ctx.fireChannelRead(buffer.toString(StandardCharsets.UTF_8));
+					break;
 				}
-			} else {
-				ctx.fireChannelRead(buffer.toString(StandardCharsets.UTF_8));
 			}
 		}
 	}
@@ -81,7 +86,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 			file.delete();
 		}
 		ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
-		connection.setReceivingFile(receivingFile);
+		//connection.setReceivingFile(receivingFile);
 		handleReceivingFile(connection, receivingFile, buffer);
 	}
 
@@ -90,14 +95,19 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 		try (FileOutputStream fos = new FileOutputStream(file, true)) {
 			FileChannel fileChannel = fos.getChannel();
 			ByteBuffer nioBuffer = buffer.nioBuffer();
+			MainController controller = networkHandler.getController();
 			while (nioBuffer.hasRemaining()) {
 				receivingFile.receive(nioBuffer.remaining());
 				fileChannel.write(nioBuffer);
+				long received = receivingFile.getReceived();
+				double progress = (double) received / receivingFile.getSize();
+				controller.setServerProgress(progress);
 			}
 			if (receivingFile.toReceive() == 0) {
-				connection.fileReceived();
+				//connection.fileReceived();
 				logger.debug("Received file: " + file);
-				networkHandler.getController().refresh();
+				controller.resetServerProgress();
+				controller.refreshClientFiles();
 			}
 		}
 	}

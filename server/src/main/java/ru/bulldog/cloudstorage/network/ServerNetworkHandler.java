@@ -2,6 +2,7 @@ package ru.bulldog.cloudstorage.network;
 
 import com.google.common.collect.Maps;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
@@ -16,23 +17,26 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.command.ServerCommand;
 import ru.bulldog.cloudstorage.command.ServerCommands;
-import ru.bulldog.cloudstorage.network.packet.FilePacket;
-import ru.bulldog.cloudstorage.network.packet.FileRequest;
+import ru.bulldog.cloudstorage.network.packet.FileProgressPacket;
+import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
+import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.SocketAddress;
-import java.nio.file.Files;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.util.*;
 
-public class ServerNetworkHandler {
+public class ServerNetworkHandler implements AutoCloseable {
 
 	private final static Logger logger = LogManager.getLogger(ServerNetworkHandler.class);
 	private final static Path filesDir;
 
-	private final Map<SocketAddress, Connection> activeConnections = Maps.newHashMap();
+	private final Map<UUID, Connection> activeConnections = Maps.newHashMap();
 
 	private final ServerCommands commands;
 	private final int port;
@@ -84,14 +88,14 @@ public class ServerNetworkHandler {
 		return filesDir;
 	}
 
-	public void register(SocketAddress address, SocketChannel channel) {
+	public Connection register(SocketAddress address, SocketChannel channel) {
 		Connection connection = new Connection(channel);
-		activeConnections.put(address, connection);
+		activeConnections.put(connection.getUUID(), connection);
+		return connection;
 	}
 
-	public void disconnect(SocketAddress address) {
-		Optional<Connection> clientConnection = getConnection(address);
-		clientConnection.ifPresent(connection -> {
+	public void disconnect(SocketAddress address, Connection connection) {
+		if (connection != null) {
 			try {
 				if (connection.isConnected()) {
 					connection.close();
@@ -99,12 +103,14 @@ public class ServerNetworkHandler {
 			} catch (Exception ex) {
 				logger.warn("Error close connection: " + address, ex);
 			}
-			activeConnections.remove(address);
-		});
+			activeConnections.remove(connection.getUUID());
+		} else {
+			logger.warn("Error close connection: " + address + ", session not specified.");
+		}
 	}
 
-	public Optional<Connection> getConnection(SocketAddress address) {
-		return Optional.ofNullable(activeConnections.get(address));
+	public Optional<Connection> getConnection(UUID sessionId) {
+		return Optional.ofNullable(activeConnections.get(sessionId));
 	}
 
 	public void handleCommand(String data, OutputStream output) {
@@ -123,6 +129,39 @@ public class ServerNetworkHandler {
 		if (output != null) {
 			output.write(result);
 		}
+	}
+
+	public void handleFile(FileConnection fileConnection, ByteBuf buffer) throws Exception {
+		ReceivingFile receivingFile = fileConnection.getReceivingFile();
+		File file = receivingFile.getFile();
+		try (FileOutputStream fos = new FileOutputStream(file, true)) {
+			FileChannel fileChannel = fos.getChannel();
+			ByteBuffer nioBuffer = buffer.nioBuffer();
+			while (nioBuffer.hasRemaining()) {
+				receivingFile.receive(nioBuffer.remaining());
+				fileChannel.write(nioBuffer);
+				long received = receivingFile.getReceived();
+				double progress = (double) received / receivingFile.getSize();
+				fileConnection.sendPacket(new FileProgressPacket(progress));
+			}
+			if (receivingFile.toReceive() == 0) {
+				logger.debug("Received file: " + file);
+				fileConnection.sendPacket(new FilesListPacket());
+				fileConnection.close();
+			}
+		}
+	}
+
+	@Override
+	public void close() throws Exception {
+		activeConnections.values().forEach(connection -> {
+			try {
+				connection.sendMessage("Server shutdown...");
+				connection.close();
+			} catch (Exception ex) {
+				logger.warn("Connection close error: " + connection.getChannel().remoteAddress(), ex);
+			}
+		});
 	}
 
 	static {

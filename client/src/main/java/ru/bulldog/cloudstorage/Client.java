@@ -22,12 +22,18 @@ public class Client extends Application {
 		FXMLLoader loader = new FXMLLoader(mainFXML);
 		Parent root = loader.load();
 		Scene mainWin = new Scene(root);
+		MainController controller = loader.getController();
 		primaryStage.setScene(mainWin);
 		primaryStage.setOnCloseRequest(event -> {
-			Platform.exit();
-			System.exit(0);
+			try {
+				controller.close();
+			} catch (Exception ex) {
+				LOGGER.error("Application close error.", ex);
+				Platform.exit();
+				System.exit(1);
+			}
 		});
-		primaryStage.setTitle("CloudStorage");
+		primaryStage.setTitle("Cloud Storage");
 		primaryStage.show();
 	}
 }
