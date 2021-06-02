@@ -1,6 +1,9 @@
 package ru.bulldog.cloudstorage.network;
 
+import com.google.common.collect.Lists;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
@@ -12,15 +15,25 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.gui.controllers.MainController;
 import ru.bulldog.cloudstorage.network.packet.Packet;
+import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
-public class ClientNetworkHandler {
+public class ClientNetworkHandler implements AutoCloseable {
 
 	private static final Logger logger = LogManager.getLogger(ClientNetworkHandler.class);
 	private final static String host;
 	private final static int port;
 
+	private final List<Channel> activeChannels = Lists.newArrayList();
 	private final MainController controller;
 	private final Bootstrap bootstrap;
 	private Connection connection;
@@ -35,32 +48,70 @@ public class ClientNetworkHandler {
 				.handler(new ChannelInitializer<SocketChannel>() {
 					@Override
 					protected void initChannel(SocketChannel channel) throws Exception {
-						connection = new Connection(channel);
 						ClientNetworkHandler networkHandler = ClientNetworkHandler.this;
 						channel.pipeline().addLast(
 								new ChunkedWriteHandler(),
 								new ClientInboundHandler(networkHandler),
 								new ClientPacketInboundHandler(networkHandler),
-								new ClientPacketOutboundHandler()
+								new ClientPacketOutboundHandler(networkHandler)
 						);
 					}
 				});
-		Thread connectionThread = new Thread(() -> {
+		Thread channelThread = new Thread(() -> {
 			try {
 				ChannelFuture channelFuture = bootstrap.connect().sync();
-				channelFuture.channel().closeFuture().sync();
+				SocketChannel channel = (SocketChannel) channelFuture.channel();
+				this.connection = new Connection(channel);
+				channel.closeFuture().sync();
 			} catch (Exception ex) {
 				logger.error("Connection error.", ex);
 			} finally {
 				worker.shutdownGracefully();
 			}
 		});
-		connectionThread.setDaemon(true);
-		connectionThread.start();
+		channelThread.setDaemon(true);
+		channelThread.start();
 	}
 
-	public void openFileChannel() {
+	public Channel openChannel() {
+		CompletableFuture<Channel> completableFuture = new CompletableFuture<>();
+		Thread channelThread = new Thread(() -> {
+			try {
+				ChannelFuture channelFuture = bootstrap.connect().sync();
+				Channel channel = channelFuture.channel();
+				completableFuture.complete(channel);
+				activeChannels.add(channel);
+				channel.closeFuture().sync();
+			} catch (Exception ex) {
+				logger.error("Connection error.", ex);
+			}
+		});
+		channelThread.setDaemon(true);
+		channelThread.start();
+		return completableFuture.join();
+	}
 
+	public void handleFile(FileConnection fileConnection, ByteBuf buffer) throws Exception {
+		ReceivingFile receivingFile = fileConnection.getReceivingFile();
+		File file = receivingFile.getFile();
+		try (FileOutputStream fos = new FileOutputStream(file, true)) {
+			FileChannel fileChannel = fos.getChannel();
+			ByteBuffer nioBuffer = buffer.nioBuffer();
+			while (nioBuffer.hasRemaining()) {
+				receivingFile.receive(nioBuffer.remaining());
+				fileChannel.write(nioBuffer);
+				long received = receivingFile.getReceived();
+				double progress = (double) received / receivingFile.getSize();
+				controller.setServerProgress(progress);
+			}
+			if (receivingFile.toReceive() == 0) {
+				logger.debug("Received file: " + file);
+				controller.resetServerProgress();
+				controller.refreshClientFiles();
+				fileConnection.close();
+				activeChannels.remove(fileConnection.getChannel());
+			}
+		}
 	}
 
 	public void setSession(Connection connection) {
@@ -75,6 +126,14 @@ public class ClientNetworkHandler {
 		return connection;
 	}
 
+	public UUID getSession() {
+		return connection.getUUID();
+	}
+
+	public Path getFilesDir() {
+		return controller.getFilesDir();
+	}
+
 	public void sendPacket(Packet packet) {
 		connection.sendPacket(packet);
 	}
@@ -83,5 +142,11 @@ public class ClientNetworkHandler {
 		Properties properties = System.getProperties();
 		host = properties.getProperty("server.host", "localhost");
 		port = (int) properties.getOrDefault("server.port", 8072);
+	}
+
+	@Override
+	public void close() throws Exception {
+		activeChannels.forEach(Channel::close);
+		connection.close();
 	}
 }
