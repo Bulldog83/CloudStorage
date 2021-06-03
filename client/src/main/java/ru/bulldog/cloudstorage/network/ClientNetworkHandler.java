@@ -27,7 +27,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-public class ClientNetworkHandler implements AutoCloseable {
+public class ClientNetworkHandler {
 
 	private static final Logger logger = LogManager.getLogger(ClientNetworkHandler.class);
 	private final static String host;
@@ -144,9 +144,8 @@ public class ClientNetworkHandler implements AutoCloseable {
 		port = (int) properties.getOrDefault("server.port", 8072);
 	}
 
-	@Override
-	public void close() throws Exception {
+	public ChannelFuture close() {
 		activeChannels.forEach(Channel::close);
-		connection.close();
+		return connection.close();
 	}
 }

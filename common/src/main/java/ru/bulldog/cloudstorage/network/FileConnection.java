@@ -1,5 +1,6 @@
 package ru.bulldog.cloudstorage.network;
 
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.socket.SocketChannel;
 import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
 
@@ -29,7 +30,7 @@ public class FileConnection extends Connection {
 	}
 
 	@Override
-	public void close() throws Exception {
-		fileChannel.close();
+	public ChannelFuture close() {
+		return fileChannel.close();
 	}
 }

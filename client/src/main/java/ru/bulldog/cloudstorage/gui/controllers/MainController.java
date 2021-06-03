@@ -146,8 +146,11 @@ public class MainController implements Initializable, AutoCloseable {
 
 	@Override
 	public void close() throws Exception {
-		networkHandler.close();
-		Platform.exit();
-		System.exit(0);
+		networkHandler.close().addListener(future -> {
+			if(future.isSuccess()) {
+				Platform.exit();
+				System.exit(0);
+			}
+		});
 	}
 }
