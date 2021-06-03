@@ -1,12 +1,4 @@
-plugins {
-    id 'java'
-}
-
 group 'ru.bulldog.cloudstorage'
-version '1.0-SNAPSHOT'
+version '0.1-SNAPSHOT'
 
-dependencies {}
-
-test {
-    useJUnitPlatform()
-}
+archivesBaseName = 'cloudstorage-lib'

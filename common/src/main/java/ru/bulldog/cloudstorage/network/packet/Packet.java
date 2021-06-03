@@ -26,7 +26,7 @@ public abstract class Packet implements Serializable {
 
 	public static Optional<Packet> read(DataBuffer buffer) {
 		PacketType packetType = getType(buffer.readByte());
-		if (packetType != PacketType.UNKNOWN) {
+		if (packetType.isValid()) {
 			switch (packetType) {
 				case FILES_LIST:
 					return Optional.of(new FilesListPacket(buffer));
@@ -51,6 +51,11 @@ public abstract class Packet implements Serializable {
 				.orElse(PacketType.UNKNOWN);
 	}
 
+	@Override
+	public String toString() {
+		return type + "_PACKET";
+	}
+
 	public enum PacketType {
 		FILE(10),
 		FILES_LIST(11),
@@ -69,6 +74,10 @@ public abstract class Packet implements Serializable {
 
 		public byte getIdx() {
 			return idx;
+		}
+
+		public boolean isValid() {
+			return this != UNKNOWN;
 		}
 	}
 }

@@ -26,7 +26,7 @@ public class ClientPacketOutboundHandler extends PacketOutboundHandler {
 
 	@Override
 	public void write0(ChannelHandlerContext ctx, Packet packet, ChannelPromise promise) throws Exception {
-		logger.debug("Received packet: " + packet.getType());
+		logger.debug("Received packet: " + packet);
 		switch (packet.getType()) {
 			case FILE:
 				handleFile(ctx, (FilePacket) packet);
@@ -49,7 +49,7 @@ public class ClientPacketOutboundHandler extends PacketOutboundHandler {
 			RandomAccessFile raFile = new RandomAccessFile(packet.getFile(), "rw");
 			ctx.writeAndFlush(new ChunkedFile(raFile));
 		} catch (Exception ex) {
-			logger.error("File send error: " + packet.getFile(), ex);
+			logger.error("Upload file error: " + packet.getFile(), ex);
 		}
 	}
 
