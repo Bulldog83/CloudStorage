@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="CloudStorage Client" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="ru.bulldog.cloudstorage.Client" />
+    <module name="CloudStorage.client.main" />
+    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/client" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
