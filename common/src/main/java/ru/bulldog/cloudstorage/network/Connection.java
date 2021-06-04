@@ -13,8 +13,8 @@ public class Connection {
 
 	public final static AttributeKey<Connection> SESSION_KEY = AttributeKey.valueOf("client_session");
 
-	protected final UUID sessionId;
 	private final SocketChannel channel;
+	protected UUID sessionId;
 
 	public Connection(SocketChannel channel) {
 		this.sessionId = UUID.randomUUID();
@@ -28,6 +28,10 @@ public class Connection {
 
 	protected SocketChannel getChannel() {
 		return channel;
+	}
+
+	public void setSessionId(UUID uuid) {
+		this.sessionId = uuid;
 	}
 
 	public UUID getUUID() {

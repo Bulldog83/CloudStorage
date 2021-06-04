@@ -44,9 +44,11 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 
 	private void handleSessionPacket(ChannelHandlerContext ctx, SessionPacket packet) {
 		Channel channel = ctx.channel();
-		Connection connection = new Connection((SocketChannel) channel, packet.getSession());
-		channel.attr(Connection.SESSION_KEY).set(connection);
-		networkHandler.setSession(connection);
+		Connection connection = networkHandler.getConnection();
+		if (channel.equals(connection.getChannel())) {
+			channel.attr(Connection.SESSION_KEY).set(connection);
+			connection.setSessionId(packet.getSession());
+		}
 	}
 
 	private void handleFileProgress(FileProgressPacket packet) {
@@ -71,9 +73,7 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 			file.delete();
 		}
 		SocketChannel channel = (SocketChannel) ctx.channel();
-		logger.debug("Current channel: " + channel);
 		Connection connection = networkHandler.getConnection();
-		logger.debug("Main channel: " + connection.getChannel());
 		ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
 		FileConnection fileConnection = new FileConnection(connection, channel, receivingFile);
 		channel.attr(Connection.SESSION_KEY).set(fileConnection);

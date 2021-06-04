@@ -25,15 +25,15 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 
 	@Override
 	public void channelActive(ChannelHandlerContext ctx) throws Exception {
-		super.channelActive(ctx);
 		SocketAddress address = ctx.channel().remoteAddress();
+		logger.debug("Connected channel: " + ctx.channel());
 		logger.info("Connected to: " + address);
 	}
 
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-		super.channelInactive(ctx);
 		SocketAddress address = ctx.channel().remoteAddress();
+		logger.debug("Disconnected channel: " + ctx.channel());
 		logger.info("Disconnected from: " + address);
 	}
 

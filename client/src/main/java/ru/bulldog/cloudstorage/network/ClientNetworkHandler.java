@@ -19,6 +19,7 @@ import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
@@ -112,10 +113,6 @@ public class ClientNetworkHandler {
 				activeChannels.remove(fileConnection.getChannel());
 			}
 		}
-	}
-
-	public void setSession(Connection connection) {
-		this.connection = connection;
 	}
 
 	public MainController getController() {

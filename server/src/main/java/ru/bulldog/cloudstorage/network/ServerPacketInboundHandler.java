@@ -24,7 +24,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, Packet packet) throws Exception {
-		logger.debug("Received packet: " + packet.getType());
+		logger.debug("Received packet: " + packet);
 		switch (packet.getType()) {
 			case LIST_REQUEST:
 				ctx.writeAndFlush(new FilesListPacket());

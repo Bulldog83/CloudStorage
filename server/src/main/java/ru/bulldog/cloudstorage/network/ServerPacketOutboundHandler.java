@@ -26,7 +26,7 @@ public class ServerPacketOutboundHandler extends PacketOutboundHandler {
 
 	@Override
 	public void write0(ChannelHandlerContext ctx, Packet packet, ChannelPromise promise) throws Exception {
-		logger.debug("Received packet: " + packet.getType());
+		logger.debug("Received packet: " + packet);
 		switch (packet.getType()) {
 			case FILES_LIST:
 				handleFilesList((FilesListPacket) packet);
