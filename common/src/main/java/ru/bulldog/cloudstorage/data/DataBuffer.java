@@ -32,7 +32,9 @@ public class DataBuffer extends ByteBuf {
 
 	public String readString() {
 		int len = readInt();
-		return readCharSequence(len, StandardCharsets.UTF_8).toString();
+		byte[] bytes = new byte[len];
+		readBytes(bytes);
+		return new String(bytes, StandardCharsets.UTF_8);
 	}
 
 	public DataBuffer writeString(String str) {

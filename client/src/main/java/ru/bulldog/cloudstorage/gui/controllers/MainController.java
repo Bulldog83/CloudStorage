@@ -45,7 +45,7 @@ public class MainController implements Initializable, AutoCloseable {
 		File file = clientFiles.getSelectionModel().getSelectedItem();
 		if (file != null) {
 			try {
-				FilePacket packet = new FilePacket(networkHandler.getConnection().getUUID(), file.toPath());
+				FilePacket packet = new FilePacket(networkHandler.getSession(), file.toPath());
 				networkHandler.sendPacket(packet);
 			} catch (Exception ex) {
 				logger.error("Send file error: " + file, ex);
@@ -57,7 +57,7 @@ public class MainController implements Initializable, AutoCloseable {
 		String name = serverFiles.getSelectionModel().getSelectedItem();
 		if (name != null) {
 			try {
-				FileRequest packet = new FileRequest(networkHandler.getConnection().getUUID(), name);
+				FileRequest packet = new FileRequest(networkHandler.getSession(), name);
 				networkHandler.sendPacket(packet);
 			} catch (Exception ex) {
 				logger.warn("Request file error: " + name, ex);
@@ -146,8 +146,11 @@ public class MainController implements Initializable, AutoCloseable {
 
 	@Override
 	public void close() throws Exception {
-		networkHandler.getConnection().close();
-		Platform.exit();
-		System.exit(0);
+		networkHandler.close().addListener(future -> {
+			if(future.isSuccess()) {
+				Platform.exit();
+				System.exit(0);
+			}
+		});
 	}
 }

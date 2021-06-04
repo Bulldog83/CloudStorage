@@ -1,14 +1,24 @@
 plugins {
-    id 'java'
+    id 'application'
 }
 
 group 'ru.bulldog.cloudstorage'
-version '1.0-SNAPSHOT'
+version '0.1-SNAPSHOT'
+
+archivesBaseName = 'cloudstorage-server'
+
+application {
+    mainClassName = 'ru.bulldog.cloudstorage.Server'
+}
 
 dependencies {
     implementation project(':common')
 }
 
-test {
-    useJUnitPlatform()
+jar {
+    manifest {
+        attributes(
+                'Main-Class': 'ru.bulldog.cloudstorage.Server'
+        )
+    }
 }
