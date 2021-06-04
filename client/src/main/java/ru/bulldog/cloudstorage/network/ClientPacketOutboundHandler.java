@@ -48,6 +48,7 @@ public class ClientPacketOutboundHandler extends PacketOutboundHandler {
 			ctx.write(buffer);
 			RandomAccessFile raFile = new RandomAccessFile(packet.getFile(), "rw");
 			ctx.writeAndFlush(new ChunkedFile(raFile));
+			networkHandler.getController().startTransfer("Отправляю", packet.getName());
 		} catch (Exception ex) {
 			logger.error("Upload file error: " + packet.getFile(), ex);
 		}

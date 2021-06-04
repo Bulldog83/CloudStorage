@@ -19,7 +19,6 @@ import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
@@ -103,11 +102,11 @@ public class ClientNetworkHandler {
 				fileChannel.write(nioBuffer);
 				long received = receivingFile.getReceived();
 				double progress = (double) received / receivingFile.getSize();
-				controller.setServerProgress(progress);
+				controller.updateProgress(progress);
 			}
 			if (receivingFile.toReceive() == 0) {
 				logger.debug("Received file: " + file);
-				controller.resetServerProgress();
+				controller.stopTransfer();
 				controller.refreshClientFiles();
 				fileConnection.close();
 				activeChannels.remove(fileConnection.getChannel());

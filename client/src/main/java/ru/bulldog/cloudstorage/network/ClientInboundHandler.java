@@ -50,12 +50,20 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 				if (optionalPacket.isPresent()) {
 					Packet packet = optionalPacket.get();
 					ctx.fireChannelRead(packet);
-					if (packet.getType() == Packet.PacketType.FILE) break;
+					if (packet.getType() == Packet.PacketType.FILE) {
+						return;
+					}
 				} else {
 					ctx.fireChannelRead(buffer.toString(StandardCharsets.UTF_8));
 					break;
 				}
 			}
+			buffer.clear();
 		}
+	}
+
+	@Override
+	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+		logger.warn("Connection error", cause);
 	}
 }

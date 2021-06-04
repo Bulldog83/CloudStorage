@@ -38,6 +38,7 @@ public class ServerPacketOutboundHandler extends PacketOutboundHandler {
 		DataBuffer buffer = new DataBuffer(ctx.alloc());
 		packet.write(buffer);
 		ctx.writeAndFlush(buffer);
+		buffer.clear();
 	}
 
 	private void handleFilesList(FilesListPacket packet) {

@@ -1,6 +1,5 @@
 package ru.bulldog.cloudstorage.network;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
@@ -9,8 +8,6 @@ import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.network.packet.*;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
 import java.util.List;
 
 public class ClientPacketInboundHandler extends PacketInboundHandler {
@@ -54,9 +51,9 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 	private void handleFileProgress(FileProgressPacket packet) {
 		double progress = packet.getProgress();
 		if (progress < 1.0) {
-			networkHandler.getController().setClientProgress(progress);
+			networkHandler.getController().updateProgress(progress);
 		} else {
-			networkHandler.getController().resetClientProgress();
+			networkHandler.getController().stopTransfer();
 		}
 	}
 
@@ -77,6 +74,7 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 		ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
 		FileConnection fileConnection = new FileConnection(connection, channel, receivingFile);
 		channel.attr(Connection.SESSION_KEY).set(fileConnection);
+		networkHandler.getController().startTransfer("Принимаю", fileName);
 		networkHandler.handleFile(fileConnection, packet.getBuffer());
 	}
 }
