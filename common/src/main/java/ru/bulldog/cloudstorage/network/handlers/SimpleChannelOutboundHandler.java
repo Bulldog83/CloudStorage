@@ -1,4 +1,4 @@
-package ru.bulldog.cloudstorage.network;
+package ru.bulldog.cloudstorage.network.handlers;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;

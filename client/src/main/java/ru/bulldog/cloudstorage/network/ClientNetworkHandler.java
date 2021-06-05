@@ -14,6 +14,7 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.gui.controllers.MainController;
+import ru.bulldog.cloudstorage.network.handlers.StringInboundHandler;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
 
@@ -53,7 +54,8 @@ public class ClientNetworkHandler {
 								new ChunkedWriteHandler(),
 								new ClientInboundHandler(networkHandler),
 								new ClientPacketInboundHandler(networkHandler),
-								new ClientPacketOutboundHandler(networkHandler)
+								new ClientPacketOutboundHandler(networkHandler),
+								new StringInboundHandler()
 						);
 					}
 				});

@@ -17,13 +17,13 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.command.ServerCommand;
 import ru.bulldog.cloudstorage.command.ServerCommands;
+import ru.bulldog.cloudstorage.network.handlers.StringOutboundHandler;
 import ru.bulldog.cloudstorage.network.packet.FileProgressPacket;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
@@ -59,13 +59,14 @@ public class ServerNetworkHandler implements AutoCloseable {
 							protected void initChannel(SocketChannel channel) throws Exception {
 								ServerNetworkHandler networkHandler = ServerNetworkHandler.this;
 								channel.pipeline().addLast(
-										new ObjectEncoder(),
+										//new ObjectEncoder(),
+										new StringOutboundHandler(),
 										new ChunkedWriteHandler(),
 										new ServerPacketOutboundHandler(networkHandler),
 										new ServerInboundHandler(networkHandler),
 										new ServerPacketInboundHandler(networkHandler),
-										new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
-										new StringInboundHandler(),
+										//new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
+										new ServerStringInboundHandler(),
 										new CommandInboundHandler(networkHandler)
 								);
 							}

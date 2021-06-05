@@ -6,6 +6,7 @@ import io.netty.handler.stream.ChunkedFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.data.DataBuffer;
+import ru.bulldog.cloudstorage.network.handlers.PacketOutboundHandler;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 import ru.bulldog.cloudstorage.network.packet.Packet;
@@ -38,7 +39,6 @@ public class ServerPacketOutboundHandler extends PacketOutboundHandler {
 		DataBuffer buffer = new DataBuffer(ctx.alloc());
 		packet.write(buffer);
 		ctx.writeAndFlush(buffer);
-		buffer.clear();
 	}
 
 	private void handleFilesList(FilesListPacket packet) {

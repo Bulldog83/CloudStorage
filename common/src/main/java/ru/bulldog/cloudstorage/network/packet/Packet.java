@@ -79,5 +79,9 @@ public abstract class Packet implements Serializable {
 		public boolean isValid() {
 			return this != UNKNOWN;
 		}
+
+		public boolean isFile() {
+			return this == FILE;
+		}
 	}
 }

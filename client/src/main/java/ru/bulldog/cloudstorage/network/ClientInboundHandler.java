@@ -1,7 +1,6 @@
 package ru.bulldog.cloudstorage.network;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.apache.logging.log4j.LogManager;
@@ -18,6 +17,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 	private final static Logger logger = LogManager.getLogger(ClientInboundHandler.class);
 
 	private final ClientNetworkHandler networkHandler;
+	private DataBuffer temp;
 
 	public ClientInboundHandler(ClientNetworkHandler networkHandler) {
 		this.networkHandler = networkHandler;
@@ -39,26 +39,39 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-		DataBuffer buffer = new DataBuffer((ByteBuf) msg);
+		DataBuffer buffer;
+		if (temp != null) {
+			buffer = temp.merge((ByteBuf) msg);
+			this.temp = null;
+		} else {
+			buffer = new DataBuffer((ByteBuf) msg);
+		}
 		Connection connection = ctx.channel().attr(Connection.SESSION_KEY).get();
 		if (connection == null) connection = networkHandler.getConnection();
 		if (connection.isFileConnection()) {
 			networkHandler.handleFile((FileConnection) connection, buffer);
 		} else {
 			while (buffer.isReadable()) {
-				Optional<Packet> optionalPacket = Packet.read(buffer);
-				if (optionalPacket.isPresent()) {
-					Packet packet = optionalPacket.get();
-					ctx.fireChannelRead(packet);
-					if (packet.getType() == Packet.PacketType.FILE) {
-						return;
+				try {
+					Optional<Packet> optionalPacket = Packet.read(buffer);
+					if (optionalPacket.isPresent()) {
+						Packet packet = optionalPacket.get();
+						ctx.fireChannelRead(packet);
+						if (packet.getType().isFile()) {
+							return;
+						}
+						buffer.markReaderIndex();
+					} else {
+						ctx.fireChannelRead(buffer.toString(StandardCharsets.UTF_8));
+						break;
 					}
-				} else {
-					ctx.fireChannelRead(buffer.toString(StandardCharsets.UTF_8));
+				} catch (Exception ex) {
+					buffer.resetReaderIndex();
+					this.temp = new DataBuffer(ctx.alloc(), buffer.readableBytes());
+					buffer.readBytes(temp);
 					break;
 				}
 			}
-			buffer.clear();
 		}
 	}
 
