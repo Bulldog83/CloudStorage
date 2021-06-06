@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Optional;
+import java.util.UUID;
 
 public class ServerPacketInboundHandler extends PacketInboundHandler {
 	private final static Logger logger = LogManager.getLogger(ServerPacketInboundHandler.class);
@@ -40,8 +41,8 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 
 	private void handleFilePacket(ChannelHandlerContext ctx, FilePacket packet) throws Exception {
 		Channel channel = ctx.channel();
-		Optional<Connection> connection = networkHandler.getConnection(packet.getSession());
-		if (connection.isPresent()) {
+		Optional<Connection> connectionOptional = networkHandler.getConnection(packet.getSession());
+		if (connectionOptional.isPresent()) {
 			String fileName = packet.getName();
 			File file = networkHandler.getFilesDir().resolve(fileName).toFile();
 			if (file.exists()) {
@@ -49,9 +50,16 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 				file.delete();
 			}
 			ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
-			FileConnection fileConnection = new FileConnection(connection.get(), (SocketChannel) channel, receivingFile);
-			channel.attr(Connection.SESSION_KEY).set(fileConnection);
-			networkHandler.handleFile(fileConnection, packet.getBuffer());
+			Connection channelConnection = channel.attr(Connection.SESSION_KEY).get();
+			if (channelConnection != null) {
+				Connection connection = connectionOptional.get();
+				UUID channelId = channelConnection.getUUID();
+				connection.registerChannel(channelId, channel);
+				networkHandler.unregister(channelId);
+				FileConnection fileConnection = new FileConnection(channelId, connection, (SocketChannel) channel, receivingFile);
+				channel.attr(Connection.SESSION_KEY).set(fileConnection);
+				networkHandler.handleFile(fileConnection, packet.getBuffer());
+			}
 		} else {
 			ctx.writeAndFlush("No registered session found.");
 			channel.close();

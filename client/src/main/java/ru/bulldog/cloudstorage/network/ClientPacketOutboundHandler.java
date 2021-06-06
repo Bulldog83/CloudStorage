@@ -28,7 +28,7 @@ public class ClientPacketOutboundHandler extends PacketOutboundHandler {
 		logger.debug("Received packet: " + packet);
 		switch (packet.getType()) {
 			case FILE:
-				handleFile(ctx, (FilePacket) packet);
+				handleFile((FilePacket) packet);
 				return;
 			case FILE_REQUEST:
 				handleFileRequest((FileRequest) packet);
@@ -39,24 +39,37 @@ public class ClientPacketOutboundHandler extends PacketOutboundHandler {
 		ctx.writeAndFlush(buffer);
 	}
 
-	private void handleFile(ChannelHandlerContext ctx, FilePacket packet) {
+	private void handleFile(FilePacket packet) {
 		if (packet.isEmpty()) return;
-		DataBuffer buffer = new DataBuffer(ctx.alloc());
-		try {
-			packet.write(buffer);
-			ctx.write(buffer);
-			RandomAccessFile raFile = new RandomAccessFile(packet.getFile(), "rw");
-			ctx.writeAndFlush(new ChunkedFile(raFile));
-			networkHandler.getController().startTransfer("Отправляю", packet.getName());
-		} catch (Exception ex) {
-			logger.error("Upload file error: " + packet.getFile(), ex);
-		}
+		Thread fileThread = new Thread(() -> {
+			Channel channel = networkHandler.openChannel();
+			DataBuffer buffer = new DataBuffer(channel.alloc());
+			try {
+				RandomAccessFile raFile = new RandomAccessFile(packet.getFile(), "rw");
+				packet.write(buffer);
+				channel.write(buffer);
+				channel.writeAndFlush(new ChunkedFile(raFile));
+				networkHandler.getController().startTransfer("Upload", packet.getName());
+			} catch (Exception ex) {
+				logger.error("Upload file error: " + packet.getFile(), ex);
+			}
+		}, "FileUpload");
+		fileThread.setDaemon(true);
+		fileThread.start();
 	}
 
-	private void handleFileRequest(FileRequest packet) throws Exception {
-		Channel channel = networkHandler.openChannel();
-		DataBuffer buffer = new DataBuffer(channel.alloc());
-		packet.write(buffer);
-		channel.writeAndFlush(buffer);
+	private void handleFileRequest(FileRequest packet) {
+		Thread fileThread = new Thread(() -> {
+			Channel channel = networkHandler.openChannel();
+			DataBuffer buffer = new DataBuffer(channel.alloc());
+			try {
+				packet.write(buffer);
+				channel.writeAndFlush(buffer);
+			} catch (Exception ex) {
+				logger.error("Request file error: " + packet.getName(), ex);
+			}
+		}, "FileRequest");
+		fileThread.setDaemon(true);
+		fileThread.start();
 	}
 }

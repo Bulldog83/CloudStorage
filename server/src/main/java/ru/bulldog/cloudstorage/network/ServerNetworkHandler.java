@@ -59,13 +59,13 @@ public class ServerNetworkHandler implements AutoCloseable {
 							protected void initChannel(SocketChannel channel) throws Exception {
 								ServerNetworkHandler networkHandler = ServerNetworkHandler.this;
 								channel.pipeline().addLast(
-										//new ObjectEncoder(),
+										new ObjectEncoder(),
 										new StringOutboundHandler(),
 										new ChunkedWriteHandler(),
 										new ServerPacketOutboundHandler(networkHandler),
 										new ServerInboundHandler(networkHandler),
 										new ServerPacketInboundHandler(networkHandler),
-										//new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
+										new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
 										new ServerStringInboundHandler(),
 										new CommandInboundHandler(networkHandler)
 								);
@@ -93,6 +93,10 @@ public class ServerNetworkHandler implements AutoCloseable {
 		Connection connection = new Connection(channel);
 		activeConnections.put(connection.getUUID(), connection);
 		return connection;
+	}
+
+	public void unregister(UUID uuid) {
+		activeConnections.remove(uuid);
 	}
 
 	public void disconnect(SocketAddress address, Connection connection) {
@@ -148,7 +152,9 @@ public class ServerNetworkHandler implements AutoCloseable {
 			if (receivingFile.toReceive() == 0) {
 				logger.debug("Received file: " + file);
 				fileConnection.sendPacket(new FilesListPacket());
-				fileConnection.close();
+				Optional<Connection> session = getConnection(fileConnection.getUUID());
+				session.ifPresent(connection ->
+						connection.closeChannel(fileConnection.getChannelId()));
 			}
 		}
 	}

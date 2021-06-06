@@ -17,7 +17,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 	private final static Logger logger = LogManager.getLogger(ClientInboundHandler.class);
 
 	private final ClientNetworkHandler networkHandler;
-	private DataBuffer temp;
+	private DataBuffer tempBuffer;
 
 	public ClientInboundHandler(ClientNetworkHandler networkHandler) {
 		this.networkHandler = networkHandler;
@@ -39,13 +39,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-		DataBuffer buffer;
-		if (temp != null) {
-			buffer = temp.merge((ByteBuf) msg);
-			this.temp = null;
-		} else {
-			buffer = new DataBuffer((ByteBuf) msg);
-		}
+		DataBuffer buffer = getBuffer((ByteBuf) msg);
 		Connection connection = ctx.channel().attr(Connection.SESSION_KEY).get();
 		if (connection == null) connection = networkHandler.getConnection();
 		if (connection.isFileConnection()) {
@@ -67,8 +61,8 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 					}
 				} catch (Exception ex) {
 					buffer.resetReaderIndex();
-					this.temp = new DataBuffer(ctx.alloc(), buffer.readableBytes());
-					buffer.readBytes(temp);
+					this.tempBuffer = new DataBuffer(ctx.alloc(), buffer.readableBytes());
+					buffer.readBytes(tempBuffer);
 					break;
 				}
 			}
@@ -78,5 +72,14 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 	@Override
 	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
 		logger.warn("Connection error", cause);
+	}
+
+	private DataBuffer getBuffer(ByteBuf msg) {
+		if (tempBuffer != null) {
+			DataBuffer buffer = tempBuffer.merge(msg);
+			this.tempBuffer = null;
+			return buffer;
+		}
+		return new DataBuffer(msg);
 	}
 }

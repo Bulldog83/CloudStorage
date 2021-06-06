@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 public class ClientNetworkHandler {
 
@@ -34,15 +33,14 @@ public class ClientNetworkHandler {
 	private final static String host;
 	private final static int port;
 
-	private final List<Channel> activeChannels = Lists.newArrayList();
 	private final MainController controller;
-	private final Bootstrap bootstrap;
+	private final ChannelPool channelPool;
 	private Connection connection;
 
 	public ClientNetworkHandler(MainController controller) {
 		this.controller = controller;
-		this.bootstrap = new Bootstrap();
 		EventLoopGroup worker = new NioEventLoopGroup();
+		Bootstrap bootstrap = new Bootstrap();
 		bootstrap.group(worker)
 				.channel(NioSocketChannel.class)
 				.remoteAddress(host, port)
@@ -59,6 +57,7 @@ public class ClientNetworkHandler {
 						);
 					}
 				});
+		this.channelPool = new ChannelPool(bootstrap, 5);
 		Thread channelThread = new Thread(() -> {
 			try {
 				ChannelFuture channelFuture = bootstrap.connect().sync();
@@ -70,27 +69,13 @@ public class ClientNetworkHandler {
 			} finally {
 				worker.shutdownGracefully();
 			}
-		});
+		}, "MainChannel");
 		channelThread.setDaemon(true);
 		channelThread.start();
 	}
 
 	public Channel openChannel() {
-		CompletableFuture<Channel> completableFuture = new CompletableFuture<>();
-		Thread channelThread = new Thread(() -> {
-			try {
-				ChannelFuture channelFuture = bootstrap.connect().sync();
-				Channel channel = channelFuture.channel();
-				completableFuture.complete(channel);
-				activeChannels.add(channel);
-				channel.closeFuture().sync();
-			} catch (Exception ex) {
-				logger.error("Connection error.", ex);
-			}
-		});
-		channelThread.setDaemon(true);
-		channelThread.start();
-		return completableFuture.join();
+		return channelPool.openChannel();
 	}
 
 	public void handleFile(FileConnection fileConnection, ByteBuf buffer) throws Exception {
@@ -111,7 +96,6 @@ public class ClientNetworkHandler {
 				controller.stopTransfer();
 				controller.refreshClientFiles();
 				fileConnection.close();
-				activeChannels.remove(fileConnection.getChannel());
 			}
 		}
 	}
@@ -142,8 +126,8 @@ public class ClientNetworkHandler {
 		port = (int) properties.getOrDefault("server.port", 8072);
 	}
 
-	public ChannelFuture close() {
-		activeChannels.forEach(Channel::close);
+	public ChannelFuture close() throws Exception {
+		channelPool.close();
 		return connection.close();
 	}
 }

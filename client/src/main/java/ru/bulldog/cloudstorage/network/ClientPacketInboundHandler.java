@@ -73,9 +73,9 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 		SocketChannel channel = (SocketChannel) ctx.channel();
 		Connection connection = networkHandler.getConnection();
 		ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
-		FileConnection fileConnection = new FileConnection(connection, channel, receivingFile);
+		FileConnection fileConnection = new FileConnection(null, connection, channel, receivingFile);
 		channel.attr(Connection.SESSION_KEY).set(fileConnection);
-		networkHandler.getController().startTransfer("Принимаю", fileName);
+		networkHandler.getController().startTransfer("Download", fileName);
 		networkHandler.handleFile(fileConnection, packet.getBuffer());
 	}
 }
