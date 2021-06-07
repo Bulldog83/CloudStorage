@@ -11,6 +11,7 @@ import ru.bulldog.cloudstorage.network.handlers.PacketOutboundHandler;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.FileRequest;
 import ru.bulldog.cloudstorage.network.packet.Packet;
+import ru.bulldog.cloudstorage.network.packet.SessionPacket;
 
 import java.io.RandomAccessFile;
 

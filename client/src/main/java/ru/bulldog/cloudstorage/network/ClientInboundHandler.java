@@ -1,6 +1,7 @@
 package ru.bulldog.cloudstorage.network;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.apache.logging.log4j.LogManager;
@@ -25,25 +26,25 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 
 	@Override
 	public void channelActive(ChannelHandlerContext ctx) throws Exception {
+		ctx.channel().attr(ChannelAttributes.FILE_CHANNEL).set(false);
 		SocketAddress address = ctx.channel().remoteAddress();
-		logger.debug("Connected channel: " + ctx.channel());
 		logger.info("Connected to: " + address);
 	}
 
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 		SocketAddress address = ctx.channel().remoteAddress();
-		logger.debug("Disconnected channel: " + ctx.channel());
 		logger.info("Disconnected from: " + address);
 	}
 
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 		DataBuffer buffer = getBuffer((ByteBuf) msg);
-		Connection connection = ctx.channel().attr(Session.SESSION_KEY).get();
-		if (connection == null) connection = networkHandler.getConnection();
-		if (connection.isFileConnection()) {
-			networkHandler.handleFile((FileConnection) connection, buffer);
+		Channel channel = ctx.channel();
+		if (channel.attr(ChannelAttributes.FILE_CHANNEL).get()) {
+			Session session = networkHandler.getSession();
+			FileConnection fileConnection = session.getFileChannel(channel.id());
+			networkHandler.handleFile(fileConnection, buffer);
 		} else {
 			while (buffer.isReadable()) {
 				try {

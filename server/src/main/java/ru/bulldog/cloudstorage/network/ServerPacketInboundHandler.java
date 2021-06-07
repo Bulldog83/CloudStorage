@@ -60,6 +60,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		UUID sessionId = session.getSessionId();
 		channel.attr(ChannelAttributes.SESSION_KEY).set(sessionId);
 		channel.writeAndFlush(new SessionPacket(sessionId));
+		channel.writeAndFlush(new FilesListPacket());
 	}
 
 	private void handleFilePacket(ChannelHandlerContext ctx, FilePacket packet) throws Exception {

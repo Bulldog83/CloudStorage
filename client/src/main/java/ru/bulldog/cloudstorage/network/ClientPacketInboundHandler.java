@@ -10,6 +10,7 @@ import ru.bulldog.cloudstorage.network.packet.*;
 
 import java.io.File;
 import java.util.List;
+import java.util.UUID;
 
 public class ClientPacketInboundHandler extends PacketInboundHandler {
 
@@ -37,16 +38,24 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 			case FILE:
 				handleFilePacket(ctx, (FilePacket) packet);
 				break;
+			case AUTH_REQUEST:
+				handleAuthRequest(ctx);
+				break;
+		}
+	}
+
+	private void handleAuthRequest(ChannelHandlerContext ctx) {
+		Session session = networkHandler.getSession();
+		if (session == null) {
+			ctx.writeAndFlush(new AuthData("login", "password"));
+			logger.debug("Auth data sent to: " + ctx.channel().remoteAddress());
 		}
 	}
 
 	private void handleSessionPacket(ChannelHandlerContext ctx, SessionPacket packet) {
-		Channel channel = ctx.channel();
-		Connection connection = networkHandler.getConnection();
-		if (channel.equals(connection.getChannel())) {
-			channel.attr(Session.SESSION_KEY).set(connection);
-			connection.setSessionId(packet.getSession());
-		}
+		UUID sessionId = packet.getSession();
+		ctx.channel().attr(ChannelAttributes.SESSION_KEY).set(sessionId);
+		networkHandler.setSession(sessionId);
 	}
 
 	private void handleFileProgress(FileProgressPacket packet) {
@@ -70,11 +79,12 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 			logger.warn("File exists: " + file + ". Will recreate file.");
 			file.delete();
 		}
-		SocketChannel channel = (SocketChannel) ctx.channel();
-		Connection connection = networkHandler.getConnection();
+		Channel channel = ctx.channel();
+		Session session = networkHandler.getSession();
+		channel.attr(ChannelAttributes.FILE_CHANNEL).set(true);
 		ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
-		FileConnection fileConnection = new FileConnection(null, connection, channel, receivingFile);
-		channel.attr(Session.SESSION_KEY).set(fileConnection);
+		FileConnection fileConnection = new FileConnection(session.getSessionId(), channel, receivingFile);
+		session.addFileChannel(channel.id(), fileConnection);
 		networkHandler.getController().startTransfer("Download", fileName);
 		networkHandler.handleFile(fileConnection, packet.getBuffer());
 	}

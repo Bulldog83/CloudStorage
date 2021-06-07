@@ -13,6 +13,7 @@ import javafx.stage.DirectoryChooser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.network.ClientNetworkHandler;
+import ru.bulldog.cloudstorage.network.Session;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.FileRequest;
 
@@ -53,7 +54,8 @@ public class MainController implements Initializable, AutoCloseable {
 		File file = clientFiles.getSelectionModel().getSelectedItem();
 		if (file != null) {
 			try {
-				FilePacket packet = new FilePacket(networkHandler.getSession(), file.toPath());
+				Session session = networkHandler.getSession();
+				FilePacket packet = new FilePacket(session.getSessionId(), file.toPath());
 				networkHandler.sendPacket(packet);
 			} catch (Exception ex) {
 				logger.error("Send file error: " + file, ex);
@@ -65,7 +67,8 @@ public class MainController implements Initializable, AutoCloseable {
 		String name = serverFiles.getSelectionModel().getSelectedItem();
 		if (name != null) {
 			try {
-				FileRequest packet = new FileRequest(networkHandler.getSession(), name);
+				Session session = networkHandler.getSession();
+				FileRequest packet = new FileRequest(session.getSessionId(), name);
 				networkHandler.sendPacket(packet);
 			} catch (Exception ex) {
 				logger.warn("Request file error: " + name, ex);

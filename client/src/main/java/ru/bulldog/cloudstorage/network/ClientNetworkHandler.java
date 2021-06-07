@@ -17,6 +17,7 @@ import ru.bulldog.cloudstorage.gui.controllers.MainController;
 import ru.bulldog.cloudstorage.network.handlers.StringInboundHandler;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
+import ru.bulldog.cloudstorage.network.packet.SessionPacket;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -36,6 +37,7 @@ public class ClientNetworkHandler {
 	private final MainController controller;
 	private final ChannelPool channelPool;
 	private Connection connection;
+	private Session session;
 
 	public ClientNetworkHandler(MainController controller) {
 		this.controller = controller;
@@ -49,11 +51,11 @@ public class ClientNetworkHandler {
 					protected void initChannel(SocketChannel channel) throws Exception {
 						ClientNetworkHandler networkHandler = ClientNetworkHandler.this;
 						channel.pipeline().addLast(
-								new ChunkedWriteHandler(),
-								new ClientInboundHandler(networkHandler),
-								new ClientPacketInboundHandler(networkHandler),
-								new ClientPacketOutboundHandler(networkHandler),
-								new StringInboundHandler()
+							new ChunkedWriteHandler(),
+							new ClientPacketOutboundHandler(networkHandler),
+							new ClientInboundHandler(networkHandler),
+							new ClientPacketInboundHandler(networkHandler),
+							new StringInboundHandler()
 						);
 					}
 				});
@@ -75,7 +77,9 @@ public class ClientNetworkHandler {
 	}
 
 	public Channel openChannel() {
-		return channelPool.openChannel();
+		Channel channel = channelPool.openChannel();
+		channel.writeAndFlush(new SessionPacket(session.getSessionId()));
+		return channel;
 	}
 
 	public void handleFile(FileConnection fileConnection, ByteBuf buffer) throws Exception {
@@ -108,8 +112,12 @@ public class ClientNetworkHandler {
 		return connection;
 	}
 
-	public UUID getSession() {
-		return connection.getUUID();
+	public void setSession(UUID sessionId) {
+		this.session = new Session(sessionId, connection);
+	}
+
+	public Session getSession() {
+		return session;
 	}
 
 	public Path getFilesDir() {

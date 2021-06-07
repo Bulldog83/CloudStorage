@@ -20,6 +20,11 @@ public class Session {
 		this.connection = new Connection(channel);
 	}
 
+	public Session(UUID sessionId, Connection connection) {
+		this.sessionId = sessionId;
+		this.connection = connection;
+	}
+
 	public UUID getSessionId() {
 		return sessionId;
 	}
