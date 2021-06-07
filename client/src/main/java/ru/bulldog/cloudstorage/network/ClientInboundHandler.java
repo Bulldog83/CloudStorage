@@ -40,7 +40,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 		DataBuffer buffer = getBuffer((ByteBuf) msg);
-		Connection connection = ctx.channel().attr(Connection.SESSION_KEY).get();
+		Connection connection = ctx.channel().attr(Session.SESSION_KEY).get();
 		if (connection == null) connection = networkHandler.getConnection();
 		if (connection.isFileConnection()) {
 			networkHandler.handleFile((FileConnection) connection, buffer);

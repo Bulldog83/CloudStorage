@@ -44,7 +44,7 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 		Channel channel = ctx.channel();
 		Connection connection = networkHandler.getConnection();
 		if (channel.equals(connection.getChannel())) {
-			channel.attr(Connection.SESSION_KEY).set(connection);
+			channel.attr(Session.SESSION_KEY).set(connection);
 			connection.setSessionId(packet.getSession());
 		}
 	}
@@ -74,7 +74,7 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 		Connection connection = networkHandler.getConnection();
 		ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
 		FileConnection fileConnection = new FileConnection(null, connection, channel, receivingFile);
-		channel.attr(Connection.SESSION_KEY).set(fileConnection);
+		channel.attr(Session.SESSION_KEY).set(fileConnection);
 		networkHandler.getController().startTransfer("Download", fileName);
 		networkHandler.handleFile(fileConnection, packet.getBuffer());
 	}

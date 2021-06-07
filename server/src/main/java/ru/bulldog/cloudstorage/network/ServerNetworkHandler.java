@@ -3,9 +3,7 @@ package ru.bulldog.cloudstorage.network;
 import com.google.common.collect.Maps;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.EventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -25,18 +23,20 @@ import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 public class ServerNetworkHandler implements AutoCloseable {
 
 	private final static Logger logger = LogManager.getLogger(ServerNetworkHandler.class);
 	private final static Path filesDir;
 
-	private final Map<UUID, Connection> activeConnections = Maps.newHashMap();
+	private final Map<UUID, Session> activeSessions = Maps.newHashMap();
+	private final Map<ChannelId, Channel> activeChannels = Maps.newHashMap();
 
 	private final ServerCommands commands;
 	private final int port;
@@ -89,33 +89,33 @@ public class ServerNetworkHandler implements AutoCloseable {
 		return filesDir;
 	}
 
-	public Connection register(SocketAddress address, SocketChannel channel) {
-		Connection connection = new Connection(channel);
-		activeConnections.put(connection.getUUID(), connection);
-		return connection;
+	public void registerChannel(Channel channel) {
+		activeChannels.put(channel.id(), channel);
 	}
 
-	public void unregister(UUID uuid) {
-		activeConnections.remove(uuid);
+	public Session registerSession(Channel channel) {
+		if (activeChannels.containsKey(channel.id())) {
+			channel = activeChannels.remove(channel.id());
+		}
+		UUID uuid = UUID.randomUUID();
+		Session session = new Session(uuid, channel);
+		activeSessions.put(uuid, session);
+		return session;
 	}
 
-	public void disconnect(SocketAddress address, Connection connection) {
-		if (connection != null) {
-			try {
-				if (connection.isConnected()) {
-					connection.close();
-				}
-			} catch (Exception ex) {
-				logger.warn("Error close connection: " + address, ex);
-			}
-			activeConnections.remove(connection.getUUID());
-		} else {
-			logger.warn("Error close connection: " + address + ", session not specified.");
+	public void disconnect(ChannelId id) {
+		if (activeChannels.containsKey(id)) {
+			activeChannels.remove(id).close();
 		}
 	}
 
-	public Optional<Connection> getConnection(UUID sessionId) {
-		return Optional.ofNullable(activeConnections.get(sessionId));
+	public void disconnect(Session session) {
+		activeSessions.remove(session.getSessionId());
+		session.close();
+	}
+
+	public Session getSession(UUID sessionId) {
+		return activeSessions.get(sessionId);
 	}
 
 	public void handleCommand(String data, OutputStream output) {
@@ -138,6 +138,8 @@ public class ServerNetworkHandler implements AutoCloseable {
 
 	public void handleFile(FileConnection fileConnection, ByteBuf buffer) throws Exception {
 		ReceivingFile receivingFile = fileConnection.getReceivingFile();
+		Session session = activeSessions.get(fileConnection.getSessionId());
+		Connection connection = session.getConnection();
 		File file = receivingFile.getFile();
 		try (FileOutputStream fos = new FileOutputStream(file, true)) {
 			FileChannel fileChannel = fos.getChannel();
@@ -147,28 +149,20 @@ public class ServerNetworkHandler implements AutoCloseable {
 				fileChannel.write(nioBuffer);
 				long received = receivingFile.getReceived();
 				double progress = (double) received / receivingFile.getSize();
-				fileConnection.sendPacket(new FileProgressPacket(progress));
+				connection.sendPacket(new FileProgressPacket(progress));
 			}
 			if (receivingFile.toReceive() == 0) {
 				logger.debug("Received file: " + file);
-				fileConnection.sendPacket(new FilesListPacket());
-				Optional<Connection> session = getConnection(fileConnection.getUUID());
-				session.ifPresent(connection ->
-						connection.closeChannel(fileConnection.getChannelId()));
+				connection.sendPacket(new FilesListPacket());
+				fileConnection.close();
 			}
 		}
 	}
 
 	@Override
 	public void close() throws Exception {
-		activeConnections.values().forEach(connection -> {
-			try {
-				connection.sendMessage("Server shutdown...");
-				connection.close();
-			} catch (Exception ex) {
-				logger.warn("Connection close error: " + connection.getChannel().remoteAddress(), ex);
-			}
-		});
+		activeSessions.values().forEach(Session::close);
+		activeChannels.values().forEach(Channel::close);
 	}
 
 	static {
