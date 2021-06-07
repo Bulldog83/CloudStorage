@@ -28,10 +28,6 @@ public class Connection {
 		return channel.isOpen() && channel.isActive();
 	}
 
-	public boolean isFileConnection() {
-		return false;
-	}
-
 	public ChannelFuture close() {
 		return channel.close();
 	}

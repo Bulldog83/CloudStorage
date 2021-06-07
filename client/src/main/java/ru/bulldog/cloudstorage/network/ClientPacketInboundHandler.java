@@ -2,7 +2,6 @@ package ru.bulldog.cloudstorage.network;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.socket.SocketChannel;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.network.handlers.PacketInboundHandler;
@@ -45,11 +44,9 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 	}
 
 	private void handleAuthRequest(ChannelHandlerContext ctx) {
-		Session session = networkHandler.getSession();
-		if (session == null) {
-			ctx.writeAndFlush(new AuthData("login", "password"));
-			logger.debug("Auth data sent to: " + ctx.channel().remoteAddress());
-		}
+		if (networkHandler.hasSession()) return;
+		ctx.writeAndFlush(new AuthData("login", "password"));
+		logger.debug("Auth data sent to: " + ctx.channel().remoteAddress());
 	}
 
 	private void handleSessionPacket(ChannelHandlerContext ctx, SessionPacket packet) {
@@ -83,7 +80,7 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 		Session session = networkHandler.getSession();
 		channel.attr(ChannelAttributes.FILE_CHANNEL).set(true);
 		ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
-		FileConnection fileConnection = new FileConnection(session.getSessionId(), channel, receivingFile);
+		FileConnection fileConnection = new FileConnection(channel, session.getSessionId(), receivingFile);
 		session.addFileChannel(channel.id(), fileConnection);
 		networkHandler.getController().startTransfer("Download", fileName);
 		networkHandler.handleFile(fileConnection, packet.getBuffer());

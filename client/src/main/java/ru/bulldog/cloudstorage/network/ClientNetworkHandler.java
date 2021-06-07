@@ -1,6 +1,5 @@
 package ru.bulldog.cloudstorage.network;
 
-import com.google.common.collect.Lists;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -24,7 +23,6 @@ import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -63,7 +61,7 @@ public class ClientNetworkHandler {
 		Thread channelThread = new Thread(() -> {
 			try {
 				ChannelFuture channelFuture = bootstrap.connect().sync();
-				SocketChannel channel = (SocketChannel) channelFuture.channel();
+				Channel channel = channelFuture.channel();
 				this.connection = new Connection(channel);
 				channel.closeFuture().sync();
 			} catch (Exception ex) {
@@ -99,7 +97,7 @@ public class ClientNetworkHandler {
 				logger.debug("Received file: " + file);
 				controller.stopTransfer();
 				controller.refreshClientFiles();
-				fileConnection.close();
+				session.closeFileChannel(fileConnection);
 			}
 		}
 	}
@@ -108,16 +106,16 @@ public class ClientNetworkHandler {
 		return controller;
 	}
 
-	public Connection getConnection() {
-		return connection;
-	}
-
 	public void setSession(UUID sessionId) {
 		this.session = new Session(sessionId, connection);
 	}
 
 	public Session getSession() {
 		return session;
+	}
+
+	public boolean hasSession() {
+		return session != null;
 	}
 
 	public Path getFilesDir() {

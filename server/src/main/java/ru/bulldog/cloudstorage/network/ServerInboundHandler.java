@@ -27,10 +27,10 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 	public void channelActive(ChannelHandlerContext ctx) throws Exception {
 		Channel channel = ctx.channel();
 		SocketAddress address = channel.remoteAddress();
+		logger.info("Connected: " + address);
 		channel.attr(ChannelAttributes.FILE_CHANNEL).set(false);
 		networkHandler.registerChannel(channel);
 		ctx.writeAndFlush(new AuthRequest());
-		logger.info("Connected: " + address);
 	}
 
 	@Override

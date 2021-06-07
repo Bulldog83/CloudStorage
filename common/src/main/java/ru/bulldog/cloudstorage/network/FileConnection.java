@@ -10,7 +10,7 @@ public class FileConnection extends Connection {
 	private final ReceivingFile receivingFile;
 	private final UUID sessionId;
 
-	public FileConnection(UUID sessionId, Channel channel, ReceivingFile receivingFile) {
+	public FileConnection(Channel channel, UUID sessionId, ReceivingFile receivingFile) {
 		super(channel);
 		this.sessionId = sessionId;
 		this.receivingFile = receivingFile;
@@ -22,10 +22,5 @@ public class FileConnection extends Connection {
 
 	public ReceivingFile getReceivingFile() {
 		return receivingFile;
-	}
-
-	@Override
-	public boolean isFileConnection() {
-		return true;
 	}
 }

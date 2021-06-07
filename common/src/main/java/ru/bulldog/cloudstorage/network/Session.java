@@ -45,9 +45,10 @@ public class Session {
 		fileChannels.put(channelId, channel);
 	}
 
-	public Optional<ChannelFuture> closeFileChannel(ChannelId id) {
-		if (fileChannels.containsKey(id)) {
-			return Optional.of(fileChannels.remove(id).close());
+	public Optional<ChannelFuture> closeFileChannel(FileConnection connection) {
+		ChannelId channelId = connection.getChannel().id();
+		if (fileChannels.containsKey(channelId)) {
+			return Optional.of(fileChannels.remove(channelId).close());
 		}
 		return Optional.empty();
 	}

@@ -154,7 +154,7 @@ public class ServerNetworkHandler implements AutoCloseable {
 			if (receivingFile.toReceive() == 0) {
 				logger.debug("Received file: " + file);
 				connection.sendPacket(new FilesListPacket());
-				fileConnection.close();
+				session.closeFileChannel(fileConnection);
 			}
 		}
 	}

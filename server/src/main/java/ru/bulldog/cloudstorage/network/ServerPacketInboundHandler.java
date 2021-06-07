@@ -75,7 +75,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 				file.delete();
 			}
 			ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
-			FileConnection fileConnection = new FileConnection(sessionId, channel, receivingFile);
+			FileConnection fileConnection = new FileConnection(channel, sessionId, receivingFile);
 			session.addFileChannel(channel.id(), fileConnection);
 			channel.attr(ChannelAttributes.FILE_CHANNEL).set(true);
 			networkHandler.handleFile(fileConnection, packet.getBuffer());
