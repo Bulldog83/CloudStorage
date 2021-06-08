@@ -80,7 +80,7 @@ public class ServerNetworkHandler implements AutoCloseable {
 				boss.shutdownGracefully();
 				worker.shutdownGracefully();
 			}
-		}, "Server Bootstrap");
+		}, "ServerBootstrap");
 		serverThread.setDaemon(true);
 		serverThread.start();
 	}

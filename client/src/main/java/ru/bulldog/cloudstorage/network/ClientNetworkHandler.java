@@ -2,10 +2,7 @@ package ru.bulldog.cloudstorage.network;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.EventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -16,7 +13,6 @@ import ru.bulldog.cloudstorage.gui.controllers.MainController;
 import ru.bulldog.cloudstorage.network.handlers.StringInboundHandler;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
-import ru.bulldog.cloudstorage.network.packet.SessionPacket;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -42,8 +38,9 @@ public class ClientNetworkHandler {
 		EventLoopGroup worker = new NioEventLoopGroup();
 		Bootstrap bootstrap = new Bootstrap();
 		bootstrap.group(worker)
-				.channel(NioSocketChannel.class)
 				.remoteAddress(host, port)
+				.channelFactory(NioSocketChannel::new)
+				.option(ChannelOption.SO_KEEPALIVE, true)
 				.handler(new ChannelInitializer<SocketChannel>() {
 					@Override
 					protected void initChannel(SocketChannel channel) throws Exception {
@@ -63,7 +60,11 @@ public class ClientNetworkHandler {
 				ChannelFuture channelFuture = bootstrap.connect().sync();
 				Channel channel = channelFuture.channel();
 				this.connection = new Connection(channel);
-				channel.closeFuture().sync();
+				channel.closeFuture().addListener(future -> {
+					if (future.isDone() && session != null && !session.isClosed()) {
+						logger.error("Channel closed: " + channel, future.cause());
+					}
+				}).sync();
 			} catch (Exception ex) {
 				logger.error("Connection error.", ex);
 			} finally {
@@ -75,9 +76,7 @@ public class ClientNetworkHandler {
 	}
 
 	public Channel openChannel() {
-		Channel channel = channelPool.openChannel();
-		channel.writeAndFlush(new SessionPacket(session.getSessionId()));
-		return channel;
+		return channelPool.openChannel();
 	}
 
 	public void handleFile(FileConnection fileConnection, ByteBuf buffer) throws Exception {
@@ -108,6 +107,7 @@ public class ClientNetworkHandler {
 
 	public void setSession(UUID sessionId) {
 		this.session = new Session(sessionId, connection);
+		logger.debug("Session started: " + sessionId);
 	}
 
 	public Session getSession() {
@@ -134,6 +134,6 @@ public class ClientNetworkHandler {
 
 	public ChannelFuture close() throws Exception {
 		channelPool.close();
-		return connection.close();
+		return session.close();
 	}
 }

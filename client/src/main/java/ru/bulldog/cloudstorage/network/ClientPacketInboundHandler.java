@@ -44,9 +44,15 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 	}
 
 	private void handleAuthRequest(ChannelHandlerContext ctx) {
-		if (networkHandler.hasSession()) return;
-		ctx.writeAndFlush(new AuthData("login", "password"));
-		logger.debug("Auth data sent to: " + ctx.channel().remoteAddress());
+		if (networkHandler.hasSession()) {
+			Session session = networkHandler.getSession();
+			UUID sessionId = session.getSessionId();
+			ctx.channel().attr(ChannelAttributes.SESSION_KEY).set(sessionId);
+			ctx.writeAndFlush(new SessionPacket(sessionId));
+		} else {
+			ctx.writeAndFlush(new AuthData("login", "password"));
+			logger.debug("Auth data sent to: " + ctx.channel().remoteAddress());
+		}
 	}
 
 	private void handleSessionPacket(ChannelHandlerContext ctx, SessionPacket packet) {

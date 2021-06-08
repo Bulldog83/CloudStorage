@@ -27,14 +27,12 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 	@Override
 	public void channelActive(ChannelHandlerContext ctx) throws Exception {
 		ctx.channel().attr(ChannelAttributes.FILE_CHANNEL).set(false);
-		SocketAddress address = ctx.channel().remoteAddress();
-		logger.info("Connected to: " + address);
+		logger.info("Connected: " + ctx.channel());
 	}
 
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-		SocketAddress address = ctx.channel().remoteAddress();
-		logger.info("Disconnected from: " + address);
+		logger.info("Disconnected: " + ctx.channel());
 	}
 
 	@Override
@@ -62,7 +60,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 					}
 				} catch (Exception ex) {
 					buffer.resetReaderIndex();
-					this.tempBuffer = new DataBuffer(ctx.alloc(), buffer.readableBytes());
+					tempBuffer = new DataBuffer(ctx.alloc(), buffer.readableBytes());
 					buffer.readBytes(tempBuffer);
 					break;
 				}
@@ -78,7 +76,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 	private DataBuffer getBuffer(ByteBuf msg) {
 		if (tempBuffer != null) {
 			DataBuffer buffer = tempBuffer.merge(msg);
-			this.tempBuffer = null;
+			tempBuffer = null;
 			return buffer;
 		}
 		return new DataBuffer(msg);
