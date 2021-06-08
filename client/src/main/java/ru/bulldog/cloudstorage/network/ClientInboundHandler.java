@@ -18,6 +18,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 	private final static Logger logger = LogManager.getLogger(ClientInboundHandler.class);
 
 	private final ClientNetworkHandler networkHandler;
+	private DataBuffer tempBuffer;
 
 	public ClientInboundHandler(ClientNetworkHandler networkHandler) {
 		this.networkHandler = networkHandler;
@@ -25,37 +26,61 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 
 	@Override
 	public void channelActive(ChannelHandlerContext ctx) throws Exception {
-		super.channelActive(ctx);
+		ctx.channel().attr(ChannelAttributes.FILE_CHANNEL).set(false);
 		SocketAddress address = ctx.channel().remoteAddress();
 		logger.info("Connected to: " + address);
 	}
 
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-		super.channelInactive(ctx);
 		SocketAddress address = ctx.channel().remoteAddress();
 		logger.info("Disconnected from: " + address);
 	}
 
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-		DataBuffer buffer = new DataBuffer((ByteBuf) msg);
-		Connection connection = ctx.channel().attr(Connection.SESSION_KEY).get();
-		if (connection == null) connection = networkHandler.getConnection();
-		if (connection.isFileConnection()) {
-			networkHandler.handleFile((FileConnection) connection, buffer);
+		DataBuffer buffer = getBuffer((ByteBuf) msg);
+		Channel channel = ctx.channel();
+		if (channel.attr(ChannelAttributes.FILE_CHANNEL).get()) {
+			Session session = networkHandler.getSession();
+			FileConnection fileConnection = session.getFileChannel(channel.id());
+			networkHandler.handleFile(fileConnection, buffer);
 		} else {
 			while (buffer.isReadable()) {
-				Optional<Packet> optionalPacket = Packet.read(buffer);
-				if (optionalPacket.isPresent()) {
-					Packet packet = optionalPacket.get();
-					ctx.fireChannelRead(packet);
-					if (packet.getType() == Packet.PacketType.FILE) break;
-				} else {
-					ctx.fireChannelRead(buffer.toString(StandardCharsets.UTF_8));
+				try {
+					Optional<Packet> optionalPacket = Packet.read(buffer);
+					if (optionalPacket.isPresent()) {
+						Packet packet = optionalPacket.get();
+						ctx.fireChannelRead(packet);
+						if (packet.getType().isFile()) {
+							return;
+						}
+						buffer.markReaderIndex();
+					} else {
+						ctx.fireChannelRead(buffer.toString(StandardCharsets.UTF_8));
+						break;
+					}
+				} catch (Exception ex) {
+					buffer.resetReaderIndex();
+					this.tempBuffer = new DataBuffer(ctx.alloc(), buffer.readableBytes());
+					buffer.readBytes(tempBuffer);
 					break;
 				}
 			}
 		}
+	}
+
+	@Override
+	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+		logger.warn("Connection error", cause);
+	}
+
+	private DataBuffer getBuffer(ByteBuf msg) {
+		if (tempBuffer != null) {
+			DataBuffer buffer = tempBuffer.merge(msg);
+			this.tempBuffer = null;
+			return buffer;
+		}
+		return new DataBuffer(msg);
 	}
 }

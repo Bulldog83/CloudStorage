@@ -2,9 +2,7 @@ package ru.bulldog.cloudstorage.data;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.SwappedByteBuf;
 import io.netty.util.ByteProcessor;
-import io.netty.util.internal.ObjectUtil;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,6 +22,11 @@ public class DataBuffer extends ByteBuf {
 
 	public DataBuffer(ByteBufAllocator allocator) {
 		this.bufferInternal = allocator.buffer();
+	}
+
+	public DataBuffer(ByteBufAllocator allocator, int capacity) {
+		this(allocator);
+		bufferInternal.capacity(capacity);
 	}
 
 	public DataBuffer(ByteBuf source) {
@@ -55,6 +58,12 @@ public class DataBuffer extends ByteBuf {
 		return new UUID(mostBits, leastBits);
 	}
 
+	public DataBuffer merge(ByteBuf source) {
+		capacity(capacity() + source.capacity());
+		writeBytes(source);
+		return this;
+	}
+
 	@Override
 	public int capacity() {
 		return bufferInternal.capacity();
@@ -77,21 +86,18 @@ public class DataBuffer extends ByteBuf {
 	}
 
 	@Override
+	@Deprecated
 	public ByteOrder order() {
 		return bufferInternal.order();
 	}
 
 	@Override
+	@Deprecated
 	public ByteBuf order(ByteOrder endianness) {
 		if (endianness == order()) {
 			return this;
 		}
-		ObjectUtil.checkNotNull(endianness, "endianness");
-		return newSwappedByteBuf();
-	}
-
-	protected SwappedByteBuf newSwappedByteBuf() {
-		return new SwappedByteBuf(this);
+		return bufferInternal.order(endianness);
 	}
 
 	@Override

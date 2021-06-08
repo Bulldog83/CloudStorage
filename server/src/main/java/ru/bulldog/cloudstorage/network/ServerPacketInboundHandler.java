@@ -2,16 +2,15 @@ package ru.bulldog.cloudstorage.network;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.socket.SocketChannel;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.network.handlers.PacketInboundHandler;
 import ru.bulldog.cloudstorage.network.packet.*;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Optional;
+import java.util.UUID;
 
 public class ServerPacketInboundHandler extends PacketInboundHandler {
 	private final static Logger logger = LogManager.getLogger(ServerPacketInboundHandler.class);
@@ -24,7 +23,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, Packet packet) throws Exception {
-		logger.debug("Received packet: " + packet.getType());
+		logger.debug("Received packet: " + packet);
 		switch (packet.getType()) {
 			case LIST_REQUEST:
 				ctx.writeAndFlush(new FilesListPacket());
@@ -35,13 +34,40 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 			case FILE:
 				handleFilePacket(ctx, (FilePacket) packet);
 				break;
+			case AUTH_DATA:
+				handleAuthData(ctx, (AuthData) packet);
+				break;
+			case SESSION:
+				handleSessionPacket(ctx, (SessionPacket) packet);
+				break;
 		}
+	}
+
+	private void handleSessionPacket(ChannelHandlerContext ctx, SessionPacket packet) {
+		Channel channel = ctx.channel();
+		Session session = networkHandler.getSession(packet.getSession());
+		if (session != null) {
+			channel.attr(ChannelAttributes.SESSION_KEY).set(session.getSessionId());
+		} else {
+			ctx.writeAndFlush("No session found: " + packet.getSession());
+			networkHandler.disconnect(channel.id());
+		}
+	}
+
+	private void handleAuthData(ChannelHandlerContext ctx, AuthData packet) {
+		Channel channel = ctx.channel();
+		Session session = networkHandler.registerSession(channel);
+		UUID sessionId = session.getSessionId();
+		channel.attr(ChannelAttributes.SESSION_KEY).set(sessionId);
+		channel.writeAndFlush(new SessionPacket(sessionId));
+		channel.writeAndFlush(new FilesListPacket());
 	}
 
 	private void handleFilePacket(ChannelHandlerContext ctx, FilePacket packet) throws Exception {
 		Channel channel = ctx.channel();
-		Optional<Connection> connection = networkHandler.getConnection(packet.getSession());
-		if (connection.isPresent()) {
+		UUID sessionId = packet.getSession();
+		Session session = networkHandler.getSession(sessionId);
+		if (session != null) {
 			String fileName = packet.getName();
 			File file = networkHandler.getFilesDir().resolve(fileName).toFile();
 			if (file.exists()) {
@@ -49,8 +75,9 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 				file.delete();
 			}
 			ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
-			FileConnection fileConnection = new FileConnection(connection.get(), (SocketChannel) channel, receivingFile);
-			channel.attr(Connection.SESSION_KEY).set(fileConnection);
+			FileConnection fileConnection = new FileConnection(channel, sessionId, receivingFile);
+			session.addFileChannel(channel.id(), fileConnection);
+			channel.attr(ChannelAttributes.FILE_CHANNEL).set(true);
 			networkHandler.handleFile(fileConnection, packet.getBuffer());
 		} else {
 			ctx.writeAndFlush("No registered session found.");

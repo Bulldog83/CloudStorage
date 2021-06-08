@@ -1,17 +1,15 @@
 package ru.bulldog.cloudstorage.network;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.socket.SocketChannel;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.network.handlers.PacketInboundHandler;
 import ru.bulldog.cloudstorage.network.packet.*;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
 import java.util.List;
+import java.util.UUID;
 
 public class ClientPacketInboundHandler extends PacketInboundHandler {
 
@@ -39,22 +37,30 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 			case FILE:
 				handleFilePacket(ctx, (FilePacket) packet);
 				break;
+			case AUTH_REQUEST:
+				handleAuthRequest(ctx);
+				break;
 		}
 	}
 
+	private void handleAuthRequest(ChannelHandlerContext ctx) {
+		if (networkHandler.hasSession()) return;
+		ctx.writeAndFlush(new AuthData("login", "password"));
+		logger.debug("Auth data sent to: " + ctx.channel().remoteAddress());
+	}
+
 	private void handleSessionPacket(ChannelHandlerContext ctx, SessionPacket packet) {
-		Channel channel = ctx.channel();
-		Connection connection = new Connection((SocketChannel) channel, packet.getSession());
-		channel.attr(Connection.SESSION_KEY).set(connection);
-		networkHandler.setSession(connection);
+		UUID sessionId = packet.getSession();
+		ctx.channel().attr(ChannelAttributes.SESSION_KEY).set(sessionId);
+		networkHandler.setSession(sessionId);
 	}
 
 	private void handleFileProgress(FileProgressPacket packet) {
 		double progress = packet.getProgress();
 		if (progress < 1.0) {
-			networkHandler.getController().setClientProgress(progress);
+			networkHandler.getController().updateProgress(progress);
 		} else {
-			networkHandler.getController().resetClientProgress();
+			networkHandler.getController().stopTransfer();
 		}
 	}
 
@@ -70,13 +76,13 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 			logger.warn("File exists: " + file + ". Will recreate file.");
 			file.delete();
 		}
-		SocketChannel channel = (SocketChannel) ctx.channel();
-		logger.debug("Current channel: " + channel);
-		Connection connection = networkHandler.getConnection();
-		logger.debug("Main channel: " + connection.getChannel());
+		Channel channel = ctx.channel();
+		Session session = networkHandler.getSession();
+		channel.attr(ChannelAttributes.FILE_CHANNEL).set(true);
 		ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
-		FileConnection fileConnection = new FileConnection(connection, channel, receivingFile);
-		channel.attr(Connection.SESSION_KEY).set(fileConnection);
+		FileConnection fileConnection = new FileConnection(channel, session.getSessionId(), receivingFile);
+		session.addFileChannel(channel.id(), fileConnection);
+		networkHandler.getController().startTransfer("Download", fileName);
 		networkHandler.handleFile(fileConnection, packet.getBuffer());
 	}
 }

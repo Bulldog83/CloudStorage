@@ -1,12 +1,10 @@
 package ru.bulldog.cloudstorage.network.packet;
 
-import io.netty.buffer.ByteBuf;
 import ru.bulldog.cloudstorage.data.DataBuffer;
 
-import java.io.*;
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Optional;
-import java.util.UUID;
 
 public abstract class Packet implements Serializable {
 
@@ -40,6 +38,10 @@ public abstract class Packet implements Serializable {
 					return Optional.of(new FileProgressPacket(buffer));
 				case SESSION:
 					return Optional.of(new SessionPacket(buffer));
+				case AUTH_REQUEST:
+					return Optional.of(new AuthRequest());
+				case AUTH_DATA:
+					return Optional.of(new AuthData(buffer));
 			}
 		}
 		return Optional.empty();
@@ -64,6 +66,8 @@ public abstract class Packet implements Serializable {
 		COMMAND_PACKET(14),
 		FILE_PROGRESS(15),
 		SESSION(16),
+		AUTH_REQUEST(17),
+		AUTH_DATA(18),
 		UNKNOWN(-1);
 
 		private final byte idx;
@@ -78,6 +82,10 @@ public abstract class Packet implements Serializable {
 
 		public boolean isValid() {
 			return this != UNKNOWN;
+		}
+
+		public boolean isFile() {
+			return this == FILE;
 		}
 	}
 }

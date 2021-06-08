@@ -4,13 +4,16 @@ import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.AnchorPane;
 import javafx.stage.DirectoryChooser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.network.ClientNetworkHandler;
+import ru.bulldog.cloudstorage.network.Session;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.FileRequest;
 
@@ -37,15 +40,22 @@ public class MainController implements Initializable, AutoCloseable {
 	@FXML
 	public TextField serverPath;
 	@FXML
-	public ProgressBar clientProgress;
+	public AnchorPane transferPane;
 	@FXML
-	public ProgressBar serverProgress;
+	public ProgressBar transferProgress;
+	@FXML
+	public Label progressValue;
+	@FXML
+	public Label transferState;
+	@FXML
+	public Label transferFile;
 
 	public void sendFile(ActionEvent actionEvent) {
 		File file = clientFiles.getSelectionModel().getSelectedItem();
 		if (file != null) {
 			try {
-				FilePacket packet = new FilePacket(networkHandler.getSession(), file.toPath());
+				Session session = networkHandler.getSession();
+				FilePacket packet = new FilePacket(session.getSessionId(), file.toPath());
 				networkHandler.sendPacket(packet);
 			} catch (Exception ex) {
 				logger.error("Send file error: " + file, ex);
@@ -57,7 +67,8 @@ public class MainController implements Initializable, AutoCloseable {
 		String name = serverFiles.getSelectionModel().getSelectedItem();
 		if (name != null) {
 			try {
-				FileRequest packet = new FileRequest(networkHandler.getSession(), name);
+				Session session = networkHandler.getSession();
+				FileRequest packet = new FileRequest(session.getSessionId(), name);
 				networkHandler.sendPacket(packet);
 			} catch (Exception ex) {
 				logger.warn("Request file error: " + name, ex);
@@ -108,20 +119,27 @@ public class MainController implements Initializable, AutoCloseable {
 		Platform.runLater(() -> serverFiles.getItems().setAll(names));
 	}
 
-	public void setClientProgress(double value) {
-		Platform.runLater(() -> clientProgress.setProgress(value));
+	public void startTransfer(String state, String fileName) {
+		Platform.runLater(() -> {
+			transferPane.setVisible(true);
+			transferState.setText(state + ":");
+			transferFile.setText(fileName);
+		});
 	}
 
-	public void resetClientProgress() {
-		Platform.runLater(() -> clientProgress.setProgress(0.0));
+	public void stopTransfer() {
+		Platform.runLater(() -> {
+			transferPane.setVisible(false);
+			transferProgress.setProgress(0.0);
+			progressValue.setText("0 %");
+		});
 	}
 
-	public void setServerProgress(double value) {
-		Platform.runLater(() -> serverProgress.setProgress(value));
-	}
-
-	public void resetServerProgress() {
-		Platform.runLater(() -> serverProgress.setProgress(0.0));
+	public void updateProgress(double value) {
+		Platform.runLater(() -> {
+			transferProgress.setProgress(value);
+			progressValue.setText(Math.round(value * 100.0) + " %");
+		});
 	}
 
 	public Path getFilesDir() {

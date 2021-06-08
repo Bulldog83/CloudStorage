@@ -6,6 +6,7 @@ import io.netty.handler.stream.ChunkedFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.data.DataBuffer;
+import ru.bulldog.cloudstorage.network.handlers.PacketOutboundHandler;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 import ru.bulldog.cloudstorage.network.packet.Packet;
@@ -26,7 +27,7 @@ public class ServerPacketOutboundHandler extends PacketOutboundHandler {
 
 	@Override
 	public void write0(ChannelHandlerContext ctx, Packet packet, ChannelPromise promise) throws Exception {
-		logger.debug("Received packet: " + packet.getType());
+		logger.debug("Received packet: " + packet);
 		switch (packet.getType()) {
 			case FILES_LIST:
 				handleFilesList((FilesListPacket) packet);

@@ -1,4 +1,4 @@
-package ru.bulldog.cloudstorage.network;
+package ru.bulldog.cloudstorage.network.handlers;
 
 import ru.bulldog.cloudstorage.network.packet.Packet;
 
