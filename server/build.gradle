@@ -13,6 +13,7 @@ application {
 
 dependencies {
     implementation project(':common')
+    implementation 'org.xerial:sqlite-jdbc:3.34.0'
 }
 
 jar {

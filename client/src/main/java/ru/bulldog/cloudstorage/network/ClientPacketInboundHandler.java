@@ -50,7 +50,7 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 			ctx.channel().attr(ChannelAttributes.SESSION_KEY).set(sessionId);
 			ctx.writeAndFlush(new SessionPacket(sessionId));
 		} else {
-			ctx.writeAndFlush(new AuthData("login", "password"));
+			ctx.writeAndFlush(new UserDataPacket("bulldog@pisem.net", "qwerty", "Bulldog"));
 			logger.debug("Auth data sent to: " + ctx.channel().remoteAddress());
 		}
 	}

@@ -1,5 +1,6 @@
 package ru.bulldog.cloudstorage.network;
 
+import io.netty.channel.Channel;
 import io.netty.util.AttributeKey;
 
 import java.util.UUID;

@@ -2,21 +2,24 @@ package ru.bulldog.cloudstorage.network.packet;
 
 import ru.bulldog.cloudstorage.data.DataBuffer;
 
-public class AuthData extends Packet {
+public class UserDataPacket extends Packet {
 
 	private final String email;
 	private final String password;
+	private final String nickname;
 
-	public AuthData(String email, String password) {
-		super(PacketType.AUTH_DATA);
+	public UserDataPacket(String email, String password, String nickname) {
+		super(PacketType.USER_DATA);
 		this.email = email;
 		this.password = password;
+		this.nickname = nickname;
 	}
 
-	protected AuthData(DataBuffer buffer) {
-		super(PacketType.AUTH_DATA);
+	public UserDataPacket(DataBuffer buffer) {
+		super(PacketType.USER_DATA);
 		this.email = buffer.readString();
 		this.password = buffer.readString();
+		this.nickname = buffer.readString();
 	}
 
 	public String getEmail() {
@@ -27,10 +30,15 @@ public class AuthData extends Packet {
 		return password;
 	}
 
+	public String getNickname() {
+		return nickname;
+	}
+
 	@Override
 	public void write(DataBuffer buffer) throws Exception {
 		super.write(buffer);
-		buffer.writeString(email)
-			  .writeString(password);
+		buffer.writeString(email);
+		buffer.writeString(password);
+		buffer.writeString(nickname);
 	}
 }

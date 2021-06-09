@@ -72,4 +72,8 @@ public class Session {
 	public boolean isConnected() {
 		return !closed && connection.isConnected();
 	}
+
+	public boolean isRegistered(Channel channel) {
+		return sessionId.equals(channel.attr(ChannelAttributes.SESSION_KEY).get());
+	}
 }

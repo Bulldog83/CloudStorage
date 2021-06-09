@@ -31,13 +31,6 @@ public class ChannelPool implements AutoCloseable {
 				while (!futureChannel.isDone()) {
 					if (channels.size() < count) {
 						Channel channel = connect();
-						UUID sessionId = null;
-						while (sessionId == null) {
-							sessionId = channel.attr(ChannelAttributes.SESSION_KEY).get();
-							synchronized (this) {
-								wait(100);
-							}
-						}
 						futureChannel.complete(channel);
 						break;
 					}

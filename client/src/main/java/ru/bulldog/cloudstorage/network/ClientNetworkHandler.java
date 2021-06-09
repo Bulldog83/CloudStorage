@@ -30,13 +30,15 @@ public class ClientNetworkHandler {
 
 	private final MainController controller;
 	private final ChannelPool channelPool;
+	private final EventLoopGroup worker;
+	private final Bootstrap bootstrap;
 	private Connection connection;
 	private Session session;
 
 	public ClientNetworkHandler(MainController controller) {
 		this.controller = controller;
-		EventLoopGroup worker = new NioEventLoopGroup();
-		Bootstrap bootstrap = new Bootstrap();
+		this.worker = new NioEventLoopGroup();
+		this.bootstrap = new Bootstrap();
 		bootstrap.group(worker)
 				.remoteAddress(host, port)
 				.channelFactory(NioSocketChannel::new)
@@ -55,6 +57,10 @@ public class ClientNetworkHandler {
 					}
 				});
 		this.channelPool = new ChannelPool(bootstrap, 5);
+		connect();
+	}
+
+	private void connect() {
 		Thread channelThread = new Thread(() -> {
 			try {
 				ChannelFuture channelFuture = bootstrap.connect().sync();
@@ -62,13 +68,13 @@ public class ClientNetworkHandler {
 				this.connection = new Connection(channel);
 				channel.closeFuture().addListener(future -> {
 					if (future.isDone() && session != null && !session.isClosed()) {
-						logger.error("Channel closed: " + channel, future.cause());
+						logger.warn("Channel closed: " + channel, future.cause());
+						this.session = null;
+						connect();
 					}
 				}).sync();
 			} catch (Exception ex) {
 				logger.error("Connection error.", ex);
-			} finally {
-				worker.shutdownGracefully();
 			}
 		}, "MainChannel");
 		channelThread.setDaemon(true);
@@ -76,7 +82,9 @@ public class ClientNetworkHandler {
 	}
 
 	public Channel openChannel() {
-		return channelPool.openChannel();
+		Channel channel = channelPool.openChannel();
+		while (!session.isRegistered(channel));
+		return channel;
 	}
 
 	public void handleFile(FileConnection fileConnection, ByteBuf buffer) throws Exception {
@@ -134,6 +142,10 @@ public class ClientNetworkHandler {
 
 	public ChannelFuture close() throws Exception {
 		channelPool.close();
-		return session.close();
+		return session.close().addListener(future -> {
+			if (future.isDone()) {
+				worker.shutdownGracefully();
+			}
+		});
 	}
 }
