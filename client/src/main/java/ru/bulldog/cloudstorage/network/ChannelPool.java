@@ -8,6 +8,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public class ChannelPool implements AutoCloseable {
@@ -26,11 +27,17 @@ public class ChannelPool implements AutoCloseable {
 	public Channel openChannel() {
 		CompletableFuture<Channel> futureChannel = new CompletableFuture<>();
 		Thread waitingThread = new Thread(() -> {
-			while (!futureChannel.isDone()) {
-				if (channels.size() < count) {
-					futureChannel.complete(connect());
-					break;
+			try {
+				while (!futureChannel.isDone()) {
+					if (channels.size() < count) {
+						Channel channel = connect();
+						futureChannel.complete(channel);
+						break;
+					}
 				}
+			} catch (Exception ex) {
+				logger.error("Open channel error", ex);
+				futureChannel.completeExceptionally(ex);
 			}
 		}, "ChannelWaiting");
 		waitingThread.setDaemon(true);
@@ -45,9 +52,11 @@ public class ChannelPool implements AutoCloseable {
 				ChannelFuture channelFuture = bootstrap.connect().sync();
 				Channel channel = channelFuture.channel();
 				futureChannel.complete(channel);
+				logger.debug("Channel created: " + channel);
 				channels.add(channel);
 				channel.closeFuture().addListener(future -> {
 					if (future.isDone()) {
+						logger.debug("Channel closed: " + channel);
 						channels.remove(channel);
 					}
 				}).sync();

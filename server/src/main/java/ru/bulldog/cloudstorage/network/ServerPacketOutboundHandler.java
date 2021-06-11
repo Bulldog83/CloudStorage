@@ -14,6 +14,7 @@ import ru.bulldog.cloudstorage.network.packet.Packet;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class ServerPacketOutboundHandler extends PacketOutboundHandler {
@@ -30,7 +31,7 @@ public class ServerPacketOutboundHandler extends PacketOutboundHandler {
 		logger.debug("Received packet: " + packet);
 		switch (packet.getType()) {
 			case FILES_LIST:
-				handleFilesList((FilesListPacket) packet);
+				handleFilesList(ctx, (FilesListPacket) packet);
 				break;
 			case FILE:
 				handleFile(ctx, (FilePacket) packet);
@@ -41,9 +42,10 @@ public class ServerPacketOutboundHandler extends PacketOutboundHandler {
 		ctx.writeAndFlush(buffer);
 	}
 
-	private void handleFilesList(FilesListPacket packet) {
+	private void handleFilesList(ChannelHandlerContext ctx, FilesListPacket packet) {
 		try {
-			Path filesDir = networkHandler.getFilesDir();
+			UUID sessionId = ctx.channel().attr(ChannelAttributes.SESSION_KEY).get();
+			Path filesDir = networkHandler.getFilesDir(sessionId);
 			List<String> filesNames = Files.list(filesDir)
 					.map(file -> file.getFileName().toString())
 					.collect(Collectors.toList());

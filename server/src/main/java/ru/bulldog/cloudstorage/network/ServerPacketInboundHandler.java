@@ -10,6 +10,8 @@ import ru.bulldog.cloudstorage.network.packet.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Optional;
 import java.util.UUID;
 
 public class ServerPacketInboundHandler extends PacketInboundHandler {
@@ -40,7 +42,18 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 			case SESSION:
 				handleSessionPacket(ctx, (SessionPacket) packet);
 				break;
+			case USER_DATA:
+				handleNewUser(ctx, (UserDataPacket) packet);
+				break;
 		}
+	}
+
+	private void registerSession(ChannelHandlerContext ctx, UUID sessionId) {
+		Channel channel = ctx.channel();
+		networkHandler.registerSession(channel, sessionId);
+		channel.attr(ChannelAttributes.SESSION_KEY).set(sessionId);
+		ctx.writeAndFlush(new SessionPacket(sessionId));
+		ctx.writeAndFlush(new FilesListPacket());
 	}
 
 	private void handleSessionPacket(ChannelHandlerContext ctx, SessionPacket packet) {
@@ -54,13 +67,24 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		}
 	}
 
+	private void handleNewUser(ChannelHandlerContext ctx, UserDataPacket packet) {
+		Optional<UUID> uuidOptional = networkHandler.registerUser(packet.getEmail(), packet.getPassword(), packet.getNickname());
+		if (uuidOptional.isPresent()) {
+			registerSession(ctx, uuidOptional.get());
+		} else {
+			ctx.writeAndFlush("Email already exists or registration data wrong.");
+			ctx.channel().close();
+		}
+	}
+
 	private void handleAuthData(ChannelHandlerContext ctx, AuthData packet) {
-		Channel channel = ctx.channel();
-		Session session = networkHandler.registerSession(channel);
-		UUID sessionId = session.getSessionId();
-		channel.attr(ChannelAttributes.SESSION_KEY).set(sessionId);
-		channel.writeAndFlush(new SessionPacket(sessionId));
-		channel.writeAndFlush(new FilesListPacket());
+		Optional<UUID> uuidOptional = networkHandler.getUserId(packet.getEmail(), packet.getPassword());
+		if (uuidOptional.isPresent()) {
+			registerSession(ctx, uuidOptional.get());
+		} else {
+			ctx.writeAndFlush("Invalid email or password.");
+			ctx.channel().close();
+		}
 	}
 
 	private void handleFilePacket(ChannelHandlerContext ctx, FilePacket packet) throws Exception {
@@ -69,7 +93,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		Session session = networkHandler.getSession(sessionId);
 		if (session != null) {
 			String fileName = packet.getName();
-			File file = networkHandler.getFilesDir().resolve(fileName).toFile();
+			File file = networkHandler.getFilesDir(sessionId).resolve(fileName).toFile();
 			if (file.exists()) {
 				logger.warn("File exists: " + file + ". Will recreate file.");
 				file.delete();
@@ -86,16 +110,21 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 	}
 
 	private void handleFileRequest(ChannelHandlerContext ctx, FileRequest packet) throws IOException {
+		Channel channel = ctx.channel();
+		channel.attr(ChannelAttributes.FILE_CHANNEL).set(true);
 		String fileName = packet.getName();
-		Files.list(networkHandler.getFilesDir()).forEach(file -> {
-			try {
-				if (fileName.equals(file.getFileName().toString())) {
-					FilePacket filePacket = new FilePacket(packet.getSession(), file);
-					ctx.writeAndFlush(filePacket);
-				}
-			} catch (IOException ex) {
-				logger.error(ex.getLocalizedMessage(), ex);
+		UUID sessionId = channel.attr(ChannelAttributes.SESSION_KEY).get();
+		Optional<Path> filePath = Files.list(networkHandler.getFilesDir(sessionId))
+				.filter(path -> fileName.equals(path.toFile().getName())).findFirst();
+		if (filePath.isPresent()) {
+			FilePacket filePacket = new FilePacket(packet.getSession(), filePath.get());
+			ctx.writeAndFlush(filePacket);
+		} else {
+			Session session = networkHandler.getSession(sessionId);
+			if (session != null) {
+				session.getConnection().sendMessage("File not found.");
 			}
-		});
+			channel.close();
+		}
 	}
 }

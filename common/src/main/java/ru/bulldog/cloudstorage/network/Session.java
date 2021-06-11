@@ -14,6 +14,7 @@ public class Session {
 	public final Map<ChannelId, FileConnection> fileChannels = Maps.newHashMap();
 	public final UUID sessionId;
 	public final Connection connection;
+	private boolean closed = false;
 
 	public Session(UUID sessionId, Channel channel) {
 		this.sessionId = sessionId;
@@ -43,6 +44,11 @@ public class Session {
 
 	public void addFileChannel(ChannelId channelId, FileConnection channel) {
 		fileChannels.put(channelId, channel);
+		channel.getChannel().closeFuture().addListener(future -> {
+			if (future.isDone()) {
+				fileChannels.remove(channelId);
+			}
+		});
 	}
 
 	public Optional<ChannelFuture> closeFileChannel(FileConnection connection) {
@@ -53,12 +59,21 @@ public class Session {
 		return Optional.empty();
 	}
 
+	public boolean isClosed() {
+		return closed;
+	}
+
 	public ChannelFuture close() {
+		this.closed = true;
 		fileChannels.values().forEach(FileConnection::close);
 		return connection.close();
 	}
 
 	public boolean isConnected() {
-		return connection.isConnected();
+		return !closed && connection.isConnected();
+	}
+
+	public boolean isRegistered(Channel channel) {
+		return sessionId.equals(channel.attr(ChannelAttributes.SESSION_KEY).get());
 	}
 }

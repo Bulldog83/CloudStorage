@@ -15,6 +15,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.command.ServerCommand;
 import ru.bulldog.cloudstorage.command.ServerCommands;
+import ru.bulldog.cloudstorage.database.AuthService;
+import ru.bulldog.cloudstorage.database.DBAuthService;
 import ru.bulldog.cloudstorage.network.handlers.StringOutboundHandler;
 import ru.bulldog.cloudstorage.network.packet.FileProgressPacket;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
@@ -39,9 +41,11 @@ public class ServerNetworkHandler implements AutoCloseable {
 	private final Map<ChannelId, Channel> activeChannels = Maps.newHashMap();
 
 	private final ServerCommands commands;
+	private final AuthService authService;
 	private final int port;
 
 	public ServerNetworkHandler(int port) {
+		this.authService = new DBAuthService();
 		this.commands = new ServerCommands(this);
 		this.port = port;
 	}
@@ -80,7 +84,7 @@ public class ServerNetworkHandler implements AutoCloseable {
 				boss.shutdownGracefully();
 				worker.shutdownGracefully();
 			}
-		}, "Server Bootstrap");
+		}, "ServerBootstrap");
 		serverThread.setDaemon(true);
 		serverThread.start();
 	}
@@ -89,17 +93,33 @@ public class ServerNetworkHandler implements AutoCloseable {
 		return filesDir;
 	}
 
+	public Path getFilesDir(UUID uuid) {
+		Path userDir = filesDir.resolve(uuid.toString());
+		File directory = userDir.toFile();
+		if (!directory.exists()) {
+			directory.mkdirs();
+		}
+		return userDir;
+	}
+
 	public void registerChannel(Channel channel) {
 		activeChannels.put(channel.id(), channel);
 	}
 
-	public Session registerSession(Channel channel) {
+	public Optional<UUID> getUserId(String email, String password) {
+		return authService.getUserId(email, password);
+	}
+
+	public Optional<UUID> registerUser(String email, String password, String nickname) {
+		return authService.registerUser(email, password, nickname);
+	}
+
+	public Session registerSession(Channel channel, UUID userId) {
 		if (activeChannels.containsKey(channel.id())) {
 			channel = activeChannels.remove(channel.id());
 		}
-		UUID uuid = UUID.randomUUID();
-		Session session = new Session(uuid, channel);
-		activeSessions.put(uuid, session);
+		Session session = new Session(userId, channel);
+		activeSessions.put(userId, session);
 		return session;
 	}
 

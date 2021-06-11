@@ -42,6 +42,8 @@ public abstract class Packet implements Serializable {
 					return Optional.of(new AuthRequest());
 				case AUTH_DATA:
 					return Optional.of(new AuthData(buffer));
+				case USER_DATA:
+					return Optional.of(new UserDataPacket(buffer));
 			}
 		}
 		return Optional.empty();
@@ -68,6 +70,7 @@ public abstract class Packet implements Serializable {
 		SESSION(16),
 		AUTH_REQUEST(17),
 		AUTH_DATA(18),
+		USER_DATA(19),
 		UNKNOWN(-1);
 
 		private final byte idx;

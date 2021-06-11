@@ -36,10 +36,12 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 		Channel channel = ctx.channel();
+		if (!channel.attr(ChannelAttributes.FILE_CHANNEL).get()) {
+			UUID sessionId = channel.attr(ChannelAttributes.SESSION_KEY).get();
+			Session session = networkHandler.getSession(sessionId);
+			networkHandler.disconnect(session);
+		}
 		SocketAddress address = channel.remoteAddress();
-		UUID sessionId = channel.attr(ChannelAttributes.SESSION_KEY).get();
-		Session session = networkHandler.getSession(sessionId);
-		networkHandler.disconnect(session);
 		logger.info("Disconnected: " + address);
 	}
 
@@ -70,7 +72,8 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 			if (optionalPacket.isPresent()) {
 				Packet packet = optionalPacket.get();
 				if (packet.getType() == PacketType.AUTH_DATA ||
-					packet.getType() == PacketType.SESSION)
+					packet.getType() == PacketType.SESSION ||
+					packet.getType() == PacketType.USER_DATA)
 				{
 					ctx.fireChannelRead(packet);
 					return;
@@ -89,9 +92,7 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 		Session session = networkHandler.getSession(sessionId);
 		if (session != null) {
 			SocketAddress address = channel.remoteAddress();
-			if (session.isConnected()) {
-				logger.warn("Handled error: " + address, cause);
-			}
+			logger.warn("Connection error: " + address, cause);
 			networkHandler.disconnect(session);
 		} else {
 			channel.close();
