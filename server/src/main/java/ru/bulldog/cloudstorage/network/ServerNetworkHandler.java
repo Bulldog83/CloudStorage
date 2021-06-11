@@ -63,13 +63,11 @@ public class ServerNetworkHandler implements AutoCloseable {
 							protected void initChannel(SocketChannel channel) throws Exception {
 								ServerNetworkHandler networkHandler = ServerNetworkHandler.this;
 								channel.pipeline().addLast(
-										new ObjectEncoder(),
 										new StringOutboundHandler(),
 										new ChunkedWriteHandler(),
 										new ServerPacketOutboundHandler(networkHandler),
 										new ServerInboundHandler(networkHandler),
 										new ServerPacketInboundHandler(networkHandler),
-										new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
 										new ServerStringInboundHandler(),
 										new CommandInboundHandler(networkHandler)
 								);

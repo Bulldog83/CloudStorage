@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+
+<AnchorPane fx:id="authWindow" prefHeight="320.0" prefWidth="420.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ru.bulldog.cloudstorage.gui.controllers.AuthController">
+   <children>
+      <Label alignment="CENTER_RIGHT" text="Email" textAlignment="RIGHT" AnchorPane.leftAnchor="50.0" AnchorPane.topAnchor="76.0" />
+      <TextField fx:id="emailField" prefHeight="25.0" prefWidth="300.0" AnchorPane.leftAnchor="92.0" AnchorPane.topAnchor="72.0" />
+      <Label alignment="CENTER_RIGHT" text="Password" textAlignment="RIGHT" AnchorPane.leftAnchor="29.0" AnchorPane.topAnchor="113.0" />
+      <PasswordField fx:id="passwordField" prefHeight="25.0" prefWidth="300.0" AnchorPane.leftAnchor="92.0" AnchorPane.topAnchor="109.0" />
+      <Label fx:id="labStatus" alignment="TOP_CENTER" prefHeight="65.0" prefWidth="400.0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" />
+      <AnchorPane fx:id="authPane" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+         <children>
+            <CheckBox fx:id="rememberPassword" layoutX="93.0" layoutY="144.0" mnemonicParsing="false" text="Remember password" AnchorPane.leftAnchor="93.0" AnchorPane.topAnchor="144.0" />
+            <Button layoutX="106.0" layoutY="195.0" mnemonicParsing="false" onAction="#doConnect" prefWidth="100.0" text="Connect" AnchorPane.leftAnchor="106.0" AnchorPane.topAnchor="195.0" />
+            <Button layoutX="214.0" layoutY="195.0" mnemonicParsing="false" onAction="#openRegistration" prefWidth="100.0" text="Registration" AnchorPane.leftAnchor="214.0" AnchorPane.topAnchor="195.0" />
+         </children>
+      </AnchorPane>
+      <AnchorPane fx:id="registerPane" visible="false" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+         <children>
+            <Label alignment="CENTER_RIGHT" layoutX="14.0" layoutY="149.0" prefHeight="17.0" prefWidth="68.0" text="Nickname" textAlignment="RIGHT" AnchorPane.leftAnchor="14.0" AnchorPane.topAnchor="149.0" />
+            <TextField fx:id="nicknameField" layoutX="92.0" layoutY="145.0" prefHeight="25.0" prefWidth="300.0" AnchorPane.leftAnchor="92.0" AnchorPane.topAnchor="145.0" />
+            <Button layoutX="106.0" layoutY="195.0" mnemonicParsing="false" onAction="#doRegistration" prefWidth="100.0" text="Registration" AnchorPane.leftAnchor="106.0" AnchorPane.topAnchor="195.0" />
+            <Button layoutX="214.0" layoutY="195.0" mnemonicParsing="false" onAction="#doCancel" prefWidth="100.0" text="Cancel" AnchorPane.leftAnchor="214.0" AnchorPane.topAnchor="195.0" />
+         </children>
+      </AnchorPane>
+   </children>
+</AnchorPane>

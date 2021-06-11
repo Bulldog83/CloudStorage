@@ -55,7 +55,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 						}
 						buffer.markReaderIndex();
 					} else {
-						ctx.fireChannelRead(buffer.toString(StandardCharsets.UTF_8));
+						ctx.fireChannelRead(buffer.readString());
 						break;
 					}
 				} catch (Exception ex) {

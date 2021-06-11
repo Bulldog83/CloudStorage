@@ -11,6 +11,7 @@ import ru.bulldog.cloudstorage.network.packet.*;
 import ru.bulldog.cloudstorage.network.packet.Packet.PacketType;
 
 import java.net.SocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -56,6 +57,10 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 				FileConnection fileConnection = session.getFileChannel(channel.id());
 				if (fileConnection != null) {
 					networkHandler.handleFile(fileConnection, buffer);
+				} else {
+					logger.warn("Received file data, but FileChannel not registered.");
+					logger.warn("Session ID: " + session);
+					logger.warn("Channel: " + channel);
 				}
 			} else {
 				Optional<Packet> optionalPacket = Packet.read(buffer);
@@ -63,8 +68,8 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 					Packet packet = optionalPacket.get();
 					ctx.fireChannelRead(packet);
 				} else {
-					buffer.resetReaderIndex();
-					ctx.fireChannelRead(msg);
+					logger.warn("Unknown data received from: " + sessionId);
+					logger.warn("Channel: " + channel);
 				}
 			}
 		} else {
@@ -79,7 +84,7 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 					return;
 				}
 			}
-			logger.info("Unregistered connection detected: " + channel.remoteAddress());
+			logger.info("Unregistered connection detected: " + channel);
 			ctx.writeAndFlush("No registered session found.");
 			channel.close();
 		}

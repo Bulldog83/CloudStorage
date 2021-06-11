@@ -6,6 +6,8 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.serialization.ClassResolvers;
+import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -21,6 +23,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 public class ClientNetworkHandler {
 
@@ -57,28 +60,40 @@ public class ClientNetworkHandler {
 					}
 				});
 		this.channelPool = new ChannelPool(bootstrap, 5);
-		connect();
 	}
 
-	private void connect() {
+	public void connect(Runnable onSuccess) {
+		ChannelFuture channelFuture = connectInternal();
+		channelFuture.addListener(future -> {
+			if (future.isSuccess()) {
+				onSuccess.run();
+			}
+		});
+	}
+
+	private ChannelFuture connectInternal() {
+		CompletableFuture<ChannelFuture> futureChannel = new CompletableFuture<>();
 		Thread channelThread = new Thread(() -> {
 			try {
 				ChannelFuture channelFuture = bootstrap.connect().sync();
+				futureChannel.complete(channelFuture);
 				Channel channel = channelFuture.channel();
 				this.connection = new Connection(channel);
 				channel.closeFuture().addListener(future -> {
 					if (future.isDone() && session != null && !session.isClosed()) {
 						logger.warn("Channel closed: " + channel, future.cause());
 						this.session = null;
-						connect();
+						connectInternal();
 					}
 				}).sync();
 			} catch (Exception ex) {
 				logger.error("Connection error.", ex);
+				futureChannel.completeExceptionally(ex);
 			}
 		}, "MainChannel");
 		channelThread.setDaemon(true);
 		channelThread.start();
+		return futureChannel.join();
 	}
 
 	public Channel openChannel() {

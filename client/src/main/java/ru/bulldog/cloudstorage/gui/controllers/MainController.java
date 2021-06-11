@@ -3,13 +3,18 @@ package ru.bulldog.cloudstorage.gui.controllers;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.network.ClientNetworkHandler;
@@ -49,6 +54,15 @@ public class MainController implements Initializable, AutoCloseable {
 	public Label transferState;
 	@FXML
 	public Label transferFile;
+	@FXML
+	public AnchorPane mainWindow;
+
+	private DirectoryChooser directoryChooser;
+	private ClientNetworkHandler networkHandler;
+	private AuthController authController;
+	private Stage mainStage;
+	private Stage authStage;
+	private Path filesDir;
 
 	public void sendFile(ActionEvent actionEvent) {
 		File file = clientFiles.getSelectionModel().getSelectedItem();
@@ -95,10 +109,6 @@ public class MainController implements Initializable, AutoCloseable {
 			refreshClientFiles();
 		}
 	}
-
-	private DirectoryChooser directoryChooser;
-	private ClientNetworkHandler networkHandler;
-	private Path filesDir;
 
 	public void refreshClientFiles() {
 		Platform.runLater(() -> {
@@ -152,14 +162,29 @@ public class MainController implements Initializable, AutoCloseable {
 		this.directoryChooser = new DirectoryChooser();
 		directoryChooser.setTitle("Choose directory");
 		clientPath.setText(filesDir.toString());
-		new Thread(() -> {
+		networkHandler = new ClientNetworkHandler(this);
+		refreshClientFiles();
+
+		Platform.runLater(() -> {
+			mainStage = (Stage) mainWindow.getScene().getWindow();
 			try {
-				networkHandler = new ClientNetworkHandler(this);
-				refreshClientFiles();
+				URL authFXML = getClass().getResource("../../fxml/auth_window.fxml");
+				FXMLLoader loader = new FXMLLoader(authFXML);
+				Parent root = loader.load();
+				Scene authWin = new Scene(root);
+				authController = loader.getController();
+				authController.setNetworkHandler(networkHandler)
+							  .setController(this);
+				authStage = new Stage();
+				authStage.setScene(authWin);
+				authStage.initOwner(mainStage);
+				authStage.initModality(Modality.WINDOW_MODAL);
+				authStage.setResizable(false);
+				authStage.show();
 			} catch (Exception ex) {
-				logger.error(ex.getMessage(), ex);
+				logger.error("Auth window initialization error.", ex);
 			}
-		}).start();
+		});
 	}
 
 	@Override

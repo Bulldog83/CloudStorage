@@ -7,7 +7,7 @@
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.layout.*?>
 
-<AnchorPane prefHeight="768.0" prefWidth="1280.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ru.bulldog.cloudstorage.gui.controllers.MainController">
+<AnchorPane fx:id="mainWindow" prefHeight="768.0" prefWidth="1280.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ru.bulldog.cloudstorage.gui.controllers.MainController">
    <children>
       <ListView fx:id="clientFiles" layoutX="14.0" layoutY="74.0" prefHeight="683.0" prefWidth="600.0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="10.0" />
       <ListView fx:id="serverFiles" layoutX="656.0" layoutY="50.0" prefHeight="683.0" prefWidth="600.0" AnchorPane.bottomAnchor="10.0" AnchorPane.rightAnchor="10.0" />
