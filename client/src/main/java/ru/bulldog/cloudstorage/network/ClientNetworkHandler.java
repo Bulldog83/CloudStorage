@@ -75,8 +75,9 @@ public class ClientNetworkHandler {
 		CompletableFuture<ChannelFuture> futureChannel = new CompletableFuture<>();
 		Thread channelThread = new Thread(() -> {
 			try {
-				ChannelFuture channelFuture = bootstrap.connect().sync();
+				ChannelFuture channelFuture = bootstrap.connect();
 				futureChannel.complete(channelFuture);
+				channelFuture.sync();
 				Channel channel = channelFuture.channel();
 				this.connection = new Connection(channel);
 				channel.closeFuture().addListener(future -> {
@@ -155,12 +156,20 @@ public class ClientNetworkHandler {
 		port = (int) properties.getOrDefault("server.port", 8072);
 	}
 
+	public boolean isConnected() {
+		return session != null && session.isConnected();
+	}
+
 	public ChannelFuture close() throws Exception {
-		channelPool.close();
-		return session.close().addListener(future -> {
-			if (future.isDone()) {
-				worker.shutdownGracefully();
-			}
-		});
+		if (isConnected()) {
+			channelPool.close();
+			return session.close().addListener(future -> {
+				if (future.isDone()) {
+					worker.shutdownGracefully();
+				}
+			});
+		}
+		worker.shutdownGracefully();
+		return null;
 	}
 }

@@ -9,6 +9,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import ru.bulldog.cloudstorage.network.ClientNetworkHandler;
 
@@ -18,13 +19,15 @@ import java.util.ResourceBundle;
 public class AuthController implements Initializable {
 
 	@FXML
-	public AnchorPane registerPane;
+	public VBox registerPane;
 	@FXML
-	public AnchorPane authPane;
+	public VBox authPane;
 	@FXML
 	public TextField emailField;
 	@FXML
 	public PasswordField passwordField;
+	@FXML
+	public TextField passwordRepeat;
 	@FXML
 	public Label labStatus;
 	@FXML
@@ -50,23 +53,25 @@ public class AuthController implements Initializable {
 
 	@Override
 	public void initialize(URL location, ResourceBundle resources) {
-		Platform.runLater(() -> {
-			authStage = (Stage) authWindow.getScene().getWindow();
-		});
+		Platform.runLater(() -> authStage = (Stage) authWindow.getScene().getWindow());
 	}
 
 	public void doConnect(ActionEvent actionEvent) {
-		networkHandler.connect(() -> {
-			authStage.hide();
-		});
+		networkHandler.connect(() -> Platform.runLater(authStage::hide));
 	}
 
 	public void openRegistration(ActionEvent actionEvent) {
+		emailField.requestFocus();
+		authPane.setVisible(false);
+		registerPane.setVisible(true);
 	}
 
 	public void doRegistration(ActionEvent actionEvent) {
 	}
 
 	public void doCancel(ActionEvent actionEvent) {
+		emailField.requestFocus();
+		authPane.setVisible(true);
+		registerPane.setVisible(false);
 	}
 }

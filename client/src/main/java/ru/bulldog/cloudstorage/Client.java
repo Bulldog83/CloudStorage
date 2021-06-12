@@ -29,11 +29,15 @@ public class Client extends Application {
 				controller.close();
 			} catch (Exception ex) {
 				LOGGER.error("Application close error.", ex);
-				Platform.exit();
-				System.exit(1);
+				shutdown(1);
 			}
 		});
 		primaryStage.setTitle("Cloud Storage");
 		primaryStage.show();
+	}
+
+	public static void shutdown(int status) {
+		Platform.exit();
+		System.exit(status);
 	}
 }

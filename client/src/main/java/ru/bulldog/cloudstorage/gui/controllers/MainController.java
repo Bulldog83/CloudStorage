@@ -17,6 +17,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.Client;
 import ru.bulldog.cloudstorage.network.ClientNetworkHandler;
 import ru.bulldog.cloudstorage.network.Session;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
@@ -65,27 +66,31 @@ public class MainController implements Initializable, AutoCloseable {
 	private Path filesDir;
 
 	public void sendFile(ActionEvent actionEvent) {
-		File file = clientFiles.getSelectionModel().getSelectedItem();
-		if (file != null) {
-			try {
-				Session session = networkHandler.getSession();
-				FilePacket packet = new FilePacket(session.getSessionId(), file.toPath());
-				networkHandler.sendPacket(packet);
-			} catch (Exception ex) {
-				logger.error("Send file error: " + file, ex);
+		if (checkConnection()) {
+			File file = clientFiles.getSelectionModel().getSelectedItem();
+			if (file != null) {
+				try {
+					Session session = networkHandler.getSession();
+					FilePacket packet = new FilePacket(session.getSessionId(), file.toPath());
+					networkHandler.sendPacket(packet);
+				} catch (Exception ex) {
+					logger.error("Send file error: " + file, ex);
+				}
 			}
 		}
 	}
 
 	public void requestFile(ActionEvent actionEvent) {
-		String name = serverFiles.getSelectionModel().getSelectedItem();
-		if (name != null) {
-			try {
-				Session session = networkHandler.getSession();
-				FileRequest packet = new FileRequest(session.getSessionId(), name);
-				networkHandler.sendPacket(packet);
-			} catch (Exception ex) {
-				logger.warn("Request file error: " + name, ex);
+		if (checkConnection()) {
+			String name = serverFiles.getSelectionModel().getSelectedItem();
+			if (name != null) {
+				try {
+					Session session = networkHandler.getSession();
+					FileRequest packet = new FileRequest(session.getSessionId(), name);
+					networkHandler.sendPacket(packet);
+				} catch (Exception ex) {
+					logger.warn("Request file error: " + name, ex);
+				}
 			}
 		}
 	}
@@ -156,6 +161,14 @@ public class MainController implements Initializable, AutoCloseable {
 		return filesDir;
 	}
 
+	private boolean checkConnection() {
+		if (networkHandler.isConnected()) {
+			return true;
+		}
+		authStage.show();
+		return false;
+	}
+
 	@Override
 	public void initialize(URL location, ResourceBundle resources) {
 		this.filesDir = Paths.get("").toAbsolutePath();
@@ -189,11 +202,15 @@ public class MainController implements Initializable, AutoCloseable {
 
 	@Override
 	public void close() throws Exception {
-		networkHandler.close().addListener(future -> {
-			if(future.isDone()) {
-				Platform.exit();
-				System.exit(0);
-			}
-		});
+		if (networkHandler.isConnected()) {
+			networkHandler.close().addListener(future -> {
+				if (future.isDone()) {
+					Platform.runLater(() -> Client.shutdown(0));
+				}
+			});
+		} else {
+			networkHandler.close();
+			Client.shutdown(0);
+		}
 	}
 }
