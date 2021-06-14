@@ -19,8 +19,8 @@ public class ThreadManager extends ThreadPoolExecutor implements AutoCloseable {
 	private volatile boolean isWorking = false;
 	private volatile boolean shutdown = false;
 
-	public ThreadManager() {
-		super(8, 8, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(8), task -> {
+	public ThreadManager(int threads) {
+		super(threads, threads, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(threads), task -> {
 			if (task instanceof NamedTask) {
 				NamedTask namedTask = (NamedTask) task;
 				Thread work = new Thread(task, namedTask.getName());
@@ -35,11 +35,11 @@ public class ThreadManager extends ThreadPoolExecutor implements AutoCloseable {
 		allowCoreThreadTimeOut(false);
 		this.workingThread = new Thread(() -> {
 			try {
-				while (true) {
-					if (workQueue.size() > 0) {
-						super.execute(workQueue.poll());
-					} else {
+				while (!super.isShutdown()) {
+					if (workQueue.isEmpty()) {
 						pause();
+					} else {
+						super.execute(workQueue.poll());
 					}
 				}
 			} catch (Exception ex) {
@@ -64,15 +64,15 @@ public class ThreadManager extends ThreadPoolExecutor implements AutoCloseable {
 		if (!shutdown) {
 			logger.debug("Received new task: " + command);
 			workQueue.offer(command);
+			resume();
 		}
-		resume();
 	}
 
 	protected void executeFirst(Runnable command) {
 		if (!shutdown) {
 			workQueue.offerFirst(command);
+			resume();
 		}
-		resume();
 	}
 
 	public <T> T complete(String taskName, Supplier<T> valueSupplier) {

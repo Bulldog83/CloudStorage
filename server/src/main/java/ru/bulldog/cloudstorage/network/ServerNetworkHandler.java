@@ -49,7 +49,7 @@ public class ServerNetworkHandler implements AutoCloseable {
 	public ServerNetworkHandler(int port) {
 		this.authService = new DBAuthService();
 		this.commands = new ServerCommands(this);
-		this.threadManager = new ThreadManager();
+		this.threadManager = new ThreadManager(1);
 		this.port = port;
 	}
 

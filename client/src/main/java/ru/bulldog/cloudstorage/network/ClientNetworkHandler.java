@@ -46,7 +46,7 @@ public class ClientNetworkHandler {
 
 	public ClientNetworkHandler(MainController controller) {
 		this.controller = controller;
-		this.threadManager = new ThreadManager();
+		this.threadManager = new ThreadManager(8);
 		this.eventsHandler = EventsHandler.getInstance();
 		this.worker = new NioEventLoopGroup();
 		this.bootstrap = new Bootstrap();
