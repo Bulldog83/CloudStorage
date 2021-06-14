@@ -7,11 +7,14 @@ import io.netty.handler.stream.ChunkedFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.data.DataBuffer;
+import ru.bulldog.cloudstorage.event.EventsHandler;
 import ru.bulldog.cloudstorage.network.handlers.PacketOutboundHandler;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.FileRequest;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 import ru.bulldog.cloudstorage.network.packet.SessionPacket;
+import ru.bulldog.cloudstorage.tasks.NamedTask;
+import ru.bulldog.cloudstorage.tasks.ThreadManager;
 
 import java.io.RandomAccessFile;
 
@@ -19,8 +22,12 @@ public class ClientPacketOutboundHandler extends PacketOutboundHandler {
 	private final static Logger logger = LogManager.getLogger(ClientPacketOutboundHandler.class);
 
 	private final ClientNetworkHandler networkHandler;
+	private final ThreadManager threadManager;
+	private final EventsHandler eventsHandler;
 
 	public ClientPacketOutboundHandler(ClientNetworkHandler networkHandler) {
+		this.threadManager = networkHandler.getThreadManager();
+		this.eventsHandler = EventsHandler.getInstance();
 		this.networkHandler = networkHandler;
 	}
 
@@ -42,7 +49,7 @@ public class ClientPacketOutboundHandler extends PacketOutboundHandler {
 
 	private void handleFile(FilePacket packet) {
 		if (packet.isEmpty()) return;
-		Thread fileThread = new Thread(() -> {
+		threadManager.execute(new NamedTask("FileUpload", () -> {
 			Channel channel = networkHandler.openChannel();
 			DataBuffer buffer = new DataBuffer(channel.alloc());
 			try {
@@ -50,17 +57,15 @@ public class ClientPacketOutboundHandler extends PacketOutboundHandler {
 				packet.write(buffer);
 				channel.write(buffer);
 				channel.writeAndFlush(new ChunkedFile(raFile));
-				networkHandler.getController().startTransfer("Upload", packet.getName());
+				eventsHandler.onFileStart("Upload", packet.getName());
 			} catch (Exception ex) {
 				logger.error("Upload file error: " + packet.getFile(), ex);
 			}
-		}, "FileUpload");
-		fileThread.setDaemon(true);
-		fileThread.start();
+		}, false));
 	}
 
 	private void handleFileRequest(FileRequest packet) {
-		Thread fileThread = new Thread(() -> {
+		threadManager.execute(new NamedTask("FileRequest", () -> {
 			Channel channel = networkHandler.openChannel();
 			DataBuffer buffer = new DataBuffer(channel.alloc());
 			try {
@@ -69,8 +74,6 @@ public class ClientPacketOutboundHandler extends PacketOutboundHandler {
 			} catch (Exception ex) {
 				logger.error("Request file error: " + packet.getName(), ex);
 			}
-		}, "FileRequest");
-		fileThread.setDaemon(true);
-		fileThread.start();
+		}, false));
 	}
 }

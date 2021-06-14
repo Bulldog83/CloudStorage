@@ -15,6 +15,6 @@ public class StringOutboundHandler extends SimpleChannelOutboundHandler<String> 
 		logger.debug("Received message: " + message);
 		DataBuffer buffer = new DataBuffer(ctx.alloc());
 		buffer.writeString(message);
-		ctx.writeAndFlush(message);
+		ctx.writeAndFlush(buffer);
 	}
 }

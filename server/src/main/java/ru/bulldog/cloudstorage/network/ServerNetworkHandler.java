@@ -21,6 +21,8 @@ import ru.bulldog.cloudstorage.network.handlers.StringOutboundHandler;
 import ru.bulldog.cloudstorage.network.packet.FileProgressPacket;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
+import ru.bulldog.cloudstorage.tasks.NamedTask;
+import ru.bulldog.cloudstorage.tasks.ThreadManager;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -39,7 +41,7 @@ public class ServerNetworkHandler implements AutoCloseable {
 
 	private final Map<UUID, Session> activeSessions = Maps.newHashMap();
 	private final Map<ChannelId, Channel> activeChannels = Maps.newHashMap();
-
+	private final ThreadManager threadManager;
 	private final ServerCommands commands;
 	private final AuthService authService;
 	private final int port;
@@ -47,11 +49,12 @@ public class ServerNetworkHandler implements AutoCloseable {
 	public ServerNetworkHandler(int port) {
 		this.authService = new DBAuthService();
 		this.commands = new ServerCommands(this);
+		this.threadManager = new ThreadManager();
 		this.port = port;
 	}
 
 	public void start() {
-		Thread serverThread = new Thread(() -> {
+		threadManager.execute(new NamedTask("ServerBootstrap", () -> {
 			EventLoopGroup boss = new NioEventLoopGroup(1);
 			EventLoopGroup worker = new NioEventLoopGroup();
 			try {
@@ -63,8 +66,8 @@ public class ServerNetworkHandler implements AutoCloseable {
 							protected void initChannel(SocketChannel channel) throws Exception {
 								ServerNetworkHandler networkHandler = ServerNetworkHandler.this;
 								channel.pipeline().addLast(
-										new StringOutboundHandler(),
 										new ChunkedWriteHandler(),
+										new StringOutboundHandler(),
 										new ServerPacketOutboundHandler(networkHandler),
 										new ServerInboundHandler(networkHandler),
 										new ServerPacketInboundHandler(networkHandler),
@@ -81,10 +84,8 @@ public class ServerNetworkHandler implements AutoCloseable {
 			} finally {
 				boss.shutdownGracefully();
 				worker.shutdownGracefully();
-			}
-		}, "ServerBootstrap");
-		serverThread.setDaemon(true);
-		serverThread.start();
+			}}, true));
+		threadManager.start();
 	}
 
 	public Path getFilesDir() {
@@ -181,6 +182,7 @@ public class ServerNetworkHandler implements AutoCloseable {
 	public void close() throws Exception {
 		activeSessions.values().forEach(Session::close);
 		activeChannels.values().forEach(Channel::close);
+		threadManager.close();
 	}
 
 	static {

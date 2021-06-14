@@ -7,10 +7,8 @@ import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
-import javafx.scene.control.ProgressBar;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Modality;
@@ -18,10 +16,14 @@ import javafx.stage.Stage;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.Client;
+import ru.bulldog.cloudstorage.event.ActionListener;
+import ru.bulldog.cloudstorage.event.EventsHandler;
+import ru.bulldog.cloudstorage.event.FilesListener;
 import ru.bulldog.cloudstorage.network.ClientNetworkHandler;
 import ru.bulldog.cloudstorage.network.Session;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.FileRequest;
+import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 
 import java.io.File;
 import java.io.IOException;
@@ -61,9 +63,11 @@ public class MainController implements Initializable, AutoCloseable {
 	private DirectoryChooser directoryChooser;
 	private ClientNetworkHandler networkHandler;
 	private AuthController authController;
+	private EventsHandler eventsHandler;
 	private Stage mainStage;
 	private Stage authStage;
 	private Path filesDir;
+	private Alert alert;
 
 	public void sendFile(ActionEvent actionEvent) {
 		if (checkConnection()) {
@@ -116,45 +120,37 @@ public class MainController implements Initializable, AutoCloseable {
 	}
 
 	public void refreshClientFiles() {
-		Platform.runLater(() -> {
-			try {
-				refreshClientFiles(Files.list(filesDir).map(Path::toFile)
-						.collect(Collectors.toList()));
-			} catch (IOException ex) {
-				logger.error(ex.getMessage(), ex);
-			}
-		});
+		try {
+			refreshClientFiles(Files.list(filesDir).map(Path::toFile)
+					.collect(Collectors.toList()));
+		} catch (IOException ex) {
+			logger.error(ex.getMessage(), ex);
+		}
 	}
 
 	public void refreshClientFiles(Collection<File> files) {
-		Platform.runLater(() -> clientFiles.getItems().setAll(files));
+		clientFiles.getItems().setAll(files);
 	}
 
 	public void refreshServerFiles(Collection<String> names) {
-		Platform.runLater(() -> serverFiles.getItems().setAll(names));
+		serverFiles.getItems().setAll(names);
 	}
 
 	public void startTransfer(String state, String fileName) {
-		Platform.runLater(() -> {
-			transferPane.setVisible(true);
-			transferState.setText(state + ":");
-			transferFile.setText(fileName);
-		});
+		transferPane.setVisible(true);
+		transferState.setText(state + ":");
+		transferFile.setText(fileName);
 	}
 
 	public void stopTransfer() {
-		Platform.runLater(() -> {
-			transferPane.setVisible(false);
-			transferProgress.setProgress(0.0);
-			progressValue.setText("0 %");
-		});
+		transferPane.setVisible(false);
+		transferProgress.setProgress(0.0);
+		progressValue.setText("0 %");
 	}
 
 	public void updateProgress(double value) {
-		Platform.runLater(() -> {
-			transferProgress.setProgress(value);
-			progressValue.setText(Math.round(value * 100.0) + " %");
-		});
+		transferProgress.setProgress(value);
+		progressValue.setText(Math.round(value * 100.0) + " %");
 	}
 
 	public Path getFilesDir() {
@@ -174,8 +170,12 @@ public class MainController implements Initializable, AutoCloseable {
 		this.filesDir = Paths.get("").toAbsolutePath();
 		this.directoryChooser = new DirectoryChooser();
 		directoryChooser.setTitle("Choose directory");
+		this.alert = new Alert(AlertType.INFORMATION);
+		alert.setTitle("Message");
 		clientPath.setText(filesDir.toString());
 		networkHandler = new ClientNetworkHandler(this);
+		eventsHandler = EventsHandler.getInstance();
+		registerConnectionListener();
 		refreshClientFiles();
 
 		Platform.runLater(() -> {
@@ -186,8 +186,8 @@ public class MainController implements Initializable, AutoCloseable {
 				Parent root = loader.load();
 				Scene authWin = new Scene(root);
 				authController = loader.getController();
-				authController.setNetworkHandler(networkHandler)
-							  .setController(this);
+				authController.setNetworkHandler(networkHandler);
+				authController.setMainController(this);
 				authStage = new Stage();
 				authStage.setScene(authWin);
 				authStage.initOwner(mainStage);
@@ -197,6 +197,78 @@ public class MainController implements Initializable, AutoCloseable {
 			} catch (Exception ex) {
 				logger.error("Auth window initialization error.", ex);
 			}
+		});
+	}
+
+	private void registerConnectionListener() {
+		eventsHandler.registerListener(new ActionListener() {
+			@Override
+			public void onMessageReceived(String message) {}
+
+			@Override
+			public void onHandleError(String message) {}
+
+			@Override
+			public void onDisconnect() {}
+
+			@Override
+			public void onConnect() {
+				Platform.runLater(authStage::hide);
+				registerFileListener();
+			}
+		});
+	}
+
+	private void registerFileListener() {
+		eventsHandler.registerListener(new FilesListener() {
+			@Override
+			public void onFilesList(FilesListPacket filesList) {
+				Platform.runLater(() -> refreshServerFiles(filesList.getNames()));
+			}
+
+			@Override
+			public void onFileStart(String direction, String fileName) {
+				Platform.runLater(() -> startTransfer(direction, fileName));
+			}
+
+			@Override
+			public void onFileProgress(double progress) {
+				Platform.runLater(() -> updateProgress(progress));
+			}
+
+			@Override
+			public void onFileReceived() {
+				Platform.runLater(() -> {
+					refreshClientFiles();
+					stopTransfer();
+				});
+			}
+
+			@Override
+			public void onMessageReceived(String message) {
+				Platform.runLater(() -> {
+					alert.setAlertType(AlertType.INFORMATION);
+					alert.setContentText(message);
+					alert.showAndWait();
+				});
+			}
+
+			@Override
+			public void onHandleError(String message) {
+				Platform.runLater(() -> {
+					alert.setAlertType(AlertType.ERROR);
+					alert.setContentText(message);
+					alert.showAndWait();
+				});}
+
+			@Override
+			public void onDisconnect() {
+				Platform.runLater(authStage::show);
+				eventsHandler.removeListener(this);
+			}
+
+			@Override
+			public void onConnect() {}
 		});
 	}
 

@@ -6,27 +6,30 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.tasks.NamedTask;
+import ru.bulldog.cloudstorage.tasks.ThreadManager;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public class ChannelPool implements AutoCloseable {
 
 	private static final Logger logger = LogManager.getLogger(ChannelPool.class);
 
-	private final List<Channel> channels = Lists.newArrayList();
+	private final List<Channel> channels = Lists.newCopyOnWriteArrayList();
+	private final ThreadManager threadManager;
 	private final Bootstrap bootstrap;
 	private final int count;
 
-	public ChannelPool(Bootstrap bootstrap, int channelsCount) {
+	public ChannelPool(ThreadManager threadManager, Bootstrap bootstrap, int channelsCount) {
+		this.threadManager = threadManager;
 		this.bootstrap = bootstrap;
 		this.count = channelsCount;
 	}
 
 	public Channel openChannel() {
 		CompletableFuture<Channel> futureChannel = new CompletableFuture<>();
-		Thread waitingThread = new Thread(() -> {
+		threadManager.execute(new NamedTask("ChannelWaiting", () -> {
 			try {
 				while (!futureChannel.isDone()) {
 					if (channels.size() < count) {
@@ -39,15 +42,13 @@ public class ChannelPool implements AutoCloseable {
 				logger.error("Open channel error", ex);
 				futureChannel.completeExceptionally(ex);
 			}
-		}, "ChannelWaiting");
-		waitingThread.setDaemon(true);
-		waitingThread.start();
+		}, false));
 		return futureChannel.join();
 	}
 
 	private Channel connect() {
 		CompletableFuture<Channel> futureChannel = new CompletableFuture<>();
-		Thread channelThread = new Thread(() -> {
+		threadManager.execute(new NamedTask("ChannelThread", () -> {
 			try {
 				ChannelFuture channelFuture = bootstrap.connect().sync();
 				Channel channel = channelFuture.channel();
@@ -64,9 +65,7 @@ public class ChannelPool implements AutoCloseable {
 				logger.error("Connection error.", ex);
 				futureChannel.completeExceptionally(ex);
 			}
-		}, "ChannelThread");
-		channelThread.setDaemon(true);
-		channelThread.start();
+		}, true));
 		return futureChannel.join();
 	}
 

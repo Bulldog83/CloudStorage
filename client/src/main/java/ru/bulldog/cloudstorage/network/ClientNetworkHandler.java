@@ -6,15 +6,17 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.serialization.ClassResolvers;
-import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.event.EventsHandler;
 import ru.bulldog.cloudstorage.gui.controllers.MainController;
 import ru.bulldog.cloudstorage.network.handlers.StringInboundHandler;
+import ru.bulldog.cloudstorage.network.packet.AuthData;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
+import ru.bulldog.cloudstorage.tasks.NamedTask;
+import ru.bulldog.cloudstorage.tasks.ThreadManager;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -31,15 +33,21 @@ public class ClientNetworkHandler {
 	private final static String host;
 	private final static int port;
 
+	private final ThreadManager threadManager;
+	private final EventsHandler eventsHandler;
 	private final MainController controller;
 	private final ChannelPool channelPool;
 	private final EventLoopGroup worker;
 	private final Bootstrap bootstrap;
+
 	private Connection connection;
+	private AuthData authData;
 	private Session session;
 
 	public ClientNetworkHandler(MainController controller) {
 		this.controller = controller;
+		this.threadManager = new ThreadManager();
+		this.eventsHandler = EventsHandler.getInstance();
 		this.worker = new NioEventLoopGroup();
 		this.bootstrap = new Bootstrap();
 		bootstrap.group(worker)
@@ -55,25 +63,30 @@ public class ClientNetworkHandler {
 							new ClientPacketOutboundHandler(networkHandler),
 							new ClientInboundHandler(networkHandler),
 							new ClientPacketInboundHandler(networkHandler),
-							new StringInboundHandler()
+							new ClientStringInboundHandler()
 						);
 					}
 				});
-		this.channelPool = new ChannelPool(bootstrap, 5);
+		this.channelPool = new ChannelPool(threadManager, bootstrap, 5);
+		threadManager.start();
 	}
 
-	public void connect(Runnable onSuccess) {
-		ChannelFuture channelFuture = connectInternal();
-		channelFuture.addListener(future -> {
-			if (future.isSuccess()) {
-				onSuccess.run();
-			}
-		});
+	public ThreadManager getThreadManager() {
+		return threadManager;
+	}
+
+	public AuthData getAuthData() {
+		return authData;
+	}
+
+	public void connect(AuthData authData) {
+		this.authData = authData;
+		connectInternal();
 	}
 
 	private ChannelFuture connectInternal() {
 		CompletableFuture<ChannelFuture> futureChannel = new CompletableFuture<>();
-		Thread channelThread = new Thread(() -> {
+		threadManager.execute(new NamedTask("MainChannel", () -> {
 			try {
 				ChannelFuture channelFuture = bootstrap.connect();
 				futureChannel.complete(channelFuture);
@@ -84,16 +97,15 @@ public class ClientNetworkHandler {
 					if (future.isDone() && session != null && !session.isClosed()) {
 						logger.warn("Channel closed: " + channel, future.cause());
 						this.session = null;
-						connectInternal();
 					}
+					eventsHandler.onDisconnect();
 				}).sync();
 			} catch (Exception ex) {
 				logger.error("Connection error.", ex);
 				futureChannel.completeExceptionally(ex);
+				eventsHandler.onHandleError(ex.getMessage());
 			}
-		}, "MainChannel");
-		channelThread.setDaemon(true);
-		channelThread.start();
+		}, true));
 		return futureChannel.join();
 	}
 
@@ -114,24 +126,20 @@ public class ClientNetworkHandler {
 				fileChannel.write(nioBuffer);
 				long received = receivingFile.getReceived();
 				double progress = (double) received / receivingFile.getSize();
-				controller.updateProgress(progress);
+				eventsHandler.onFileProgress(progress);
 			}
 			if (receivingFile.toReceive() == 0) {
 				logger.debug("Received file: " + file);
-				controller.stopTransfer();
-				controller.refreshClientFiles();
 				session.closeFileChannel(fileConnection);
+				eventsHandler.onFileReceived();
 			}
 		}
-	}
-
-	public MainController getController() {
-		return controller;
 	}
 
 	public void setSession(UUID sessionId) {
 		this.session = new Session(sessionId, connection);
 		logger.debug("Session started: " + sessionId);
+		eventsHandler.onConnect();
 	}
 
 	public Session getSession() {
@@ -165,10 +173,12 @@ public class ClientNetworkHandler {
 			channelPool.close();
 			return session.close().addListener(future -> {
 				if (future.isDone()) {
+					threadManager.close();
 					worker.shutdownGracefully();
 				}
 			});
 		}
+		threadManager.close();
 		worker.shutdownGracefully();
 		return null;
 	}

@@ -7,6 +7,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.data.DataBuffer;
+import ru.bulldog.cloudstorage.event.EventsHandler;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 
 import java.net.SocketAddress;
@@ -18,9 +19,11 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 	private final static Logger logger = LogManager.getLogger(ClientInboundHandler.class);
 
 	private final ClientNetworkHandler networkHandler;
+	private final EventsHandler eventsHandler;
 	private DataBuffer tempBuffer;
 
 	public ClientInboundHandler(ClientNetworkHandler networkHandler) {
+		this.eventsHandler = EventsHandler.getInstance();
 		this.networkHandler = networkHandler;
 	}
 
@@ -55,7 +58,9 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 						}
 						buffer.markReaderIndex();
 					} else {
+						buffer.resetReaderIndex();
 						ctx.fireChannelRead(buffer.readString());
+						buffer.markReaderIndex();
 						break;
 					}
 				} catch (Exception ex) {
@@ -70,6 +75,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 
 	@Override
 	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+		eventsHandler.onHandleError(cause.getMessage());
 		logger.warn("Connection error", cause);
 	}
 

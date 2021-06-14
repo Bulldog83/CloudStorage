@@ -43,7 +43,7 @@ public abstract class Packet implements Serializable {
 				case AUTH_DATA:
 					return Optional.of(new AuthData(buffer));
 				case USER_DATA:
-					return Optional.of(new UserDataPacket(buffer));
+					return Optional.of(new RegistrationData(buffer));
 			}
 		}
 		return Optional.empty();

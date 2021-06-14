@@ -43,7 +43,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 				handleSessionPacket(ctx, (SessionPacket) packet);
 				break;
 			case USER_DATA:
-				handleNewUser(ctx, (UserDataPacket) packet);
+				handleNewUser(ctx, (RegistrationData) packet);
 				break;
 		}
 	}
@@ -67,7 +67,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		}
 	}
 
-	private void handleNewUser(ChannelHandlerContext ctx, UserDataPacket packet) {
+	private void handleNewUser(ChannelHandlerContext ctx, RegistrationData packet) {
 		Optional<UUID> uuidOptional = networkHandler.registerUser(packet.getEmail(), packet.getPassword(), packet.getNickname());
 		if (uuidOptional.isPresent()) {
 			registerSession(ctx, uuidOptional.get());
