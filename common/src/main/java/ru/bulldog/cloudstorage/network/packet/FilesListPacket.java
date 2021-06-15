@@ -2,15 +2,15 @@ package ru.bulldog.cloudstorage.network.packet;
 
 import com.google.common.collect.Lists;
 import ru.bulldog.cloudstorage.data.DataBuffer;
+import ru.bulldog.cloudstorage.data.FileInfo;
 
 import java.util.Collection;
 import java.util.List;
 
 public class FilesListPacket extends Packet {
 
-	private final static String delimiter = ":";
-
-	private List<String> names = Lists.newArrayList();
+	private final List<FileInfo> files = Lists.newArrayList();
+	private String folder;
 
 	public FilesListPacket() {
 		super(PacketType.FILES_LIST);
@@ -18,26 +18,34 @@ public class FilesListPacket extends Packet {
 
 	protected FilesListPacket(DataBuffer buffer) {
 		super(PacketType.FILES_LIST);
-		String names = buffer.readString();
-		this.names = Lists.newArrayList(names.split(delimiter));
+		this.folder = buffer.readString();
+		int count = buffer.readInt();
+		for (int i = 0; i < count; i++) {
+			files.add(buffer.readFileInfo());
+		}
 	}
 
-	public List<String> getNames() {
-		return names;
+	public String getFolder() {
+		return folder;
 	}
 
-	public void addName(String name) {
-		names.add(name);
+	public void setFolder(String folder) {
+		this.folder = folder;
 	}
 
-	public void addAll(Collection<String> names) {
-		this.names.addAll(names);
+	public List<FileInfo> getFiles() {
+		return files;
+	}
+
+	public void addAll(Collection<FileInfo> files) {
+		this.files.addAll(files);
 	}
 
 	@Override
 	public void write(DataBuffer buffer) throws Exception {
 		super.write(buffer);
-		String namesStr = String.join(delimiter, names);
-		buffer.writeString(namesStr);
+		buffer.writeString(folder);
+		buffer.writeInt(files.size());
+		files.forEach(buffer::writeFileInfo);
 	}
 }

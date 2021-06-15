@@ -1,9 +1,9 @@
 package ru.bulldog.cloudstorage.event;
 
-import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 
-import java.util.List;
+import java.util.Set;
 
 public final class EventsHandler implements FilesListener {
 
@@ -16,7 +16,7 @@ public final class EventsHandler implements FilesListener {
 		return instance;
 	}
 
-	private final List<ActionListener> registeredListeners = Lists.newArrayList();
+	private final Set<ActionListener> registeredListeners = Sets.newConcurrentHashSet();
 
 	private EventsHandler() {}
 

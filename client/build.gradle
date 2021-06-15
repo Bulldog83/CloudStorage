@@ -13,6 +13,7 @@ application {
 
 dependencies {
     implementation project(':common')
+    implementation files("lib/jlfgr-1_0.jar");
 }
 
 jar {

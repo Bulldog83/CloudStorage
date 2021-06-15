@@ -42,12 +42,7 @@ public class AuthController implements Initializable {
 	public AnchorPane authWindow;
 
 	private ClientNetworkHandler networkHandler;
-	private MainController mainController;
 	private Stage authStage;
-
-	public void setMainController(MainController mainController) {
-		this.mainController = mainController;
-	}
 
 	public void setNetworkHandler(ClientNetworkHandler networkHandler) {
 		this.networkHandler = networkHandler;
@@ -74,12 +69,6 @@ public class AuthController implements Initializable {
 		networkHandler.connect(new AuthData(email, password));
 	}
 
-	public void openRegistration(ActionEvent actionEvent) {
-		emailField.requestFocus();
-		authPane.setVisible(false);
-		registerPane.setVisible(true);
-	}
-
 	public void doRegistration(ActionEvent actionEvent) {
 		String email = emailField.getText().trim().toLowerCase();
 		String password = passwordField.getText().trim();
@@ -100,10 +89,18 @@ public class AuthController implements Initializable {
 		networkHandler.connect(new RegistrationData(email, password, nickname));
 	}
 
+	public void openRegistration(ActionEvent actionEvent) {
+		emailField.requestFocus();
+		authPane.setVisible(false);
+		registerPane.setVisible(true);
+		authStage.setTitle("Registration");
+	}
+
 	public void doCancel(ActionEvent actionEvent) {
 		emailField.requestFocus();
 		authPane.setVisible(true);
 		registerPane.setVisible(false);
+		authStage.setTitle("Authorization");
 	}
 
 	private void registerListeners() {

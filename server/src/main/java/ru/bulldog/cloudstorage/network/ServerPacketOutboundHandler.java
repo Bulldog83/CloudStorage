@@ -6,6 +6,7 @@ import io.netty.handler.stream.ChunkedFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.data.DataBuffer;
+import ru.bulldog.cloudstorage.data.FileInfo;
 import ru.bulldog.cloudstorage.network.handlers.PacketOutboundHandler;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
@@ -46,9 +47,9 @@ public class ServerPacketOutboundHandler extends PacketOutboundHandler {
 		try {
 			UUID sessionId = ctx.channel().attr(ChannelAttributes.SESSION_KEY).get();
 			Path filesDir = networkHandler.getFilesDir(sessionId);
-			List<String> filesNames = Files.list(filesDir)
-					.map(file -> file.getFileName().toString())
-					.collect(Collectors.toList());
+			String rootPath = filesDir.toString();
+			packet.setFolder(rootPath.replace(rootPath, ".\\"));
+			List<FileInfo> filesNames = Files.list(filesDir).map(FileInfo::new).collect(Collectors.toList());
 			packet.addAll(filesNames);
 		} catch (Exception ex) {
 			logger.error(ex.getLocalizedMessage(), ex);

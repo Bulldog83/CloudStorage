@@ -4,15 +4,19 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.data.FileInfo;
 import ru.bulldog.cloudstorage.network.handlers.PacketInboundHandler;
 import ru.bulldog.cloudstorage.network.packet.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class ServerPacketInboundHandler extends PacketInboundHandler {
 	private final static Logger logger = LogManager.getLogger(ServerPacketInboundHandler.class);
@@ -28,7 +32,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		logger.debug("Received packet: " + packet);
 		switch (packet.getType()) {
 			case LIST_REQUEST:
-				ctx.writeAndFlush(new FilesListPacket());
+				handleFilesListRequest(ctx, (ListRequest) packet);
 				break;
 			case FILE_REQUEST:
 				handleFileRequest(ctx, (FileRequest) packet);
@@ -45,6 +49,27 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 			case USER_DATA:
 				handleNewUser(ctx, (RegistrationData) packet);
 				break;
+		}
+	}
+
+	private void handleFilesListRequest(ChannelHandlerContext ctx, ListRequest packet) {
+		UUID sessionId = ctx.channel().attr(ChannelAttributes.SESSION_KEY).get();
+		Path filesDir = networkHandler.getFilesDir(sessionId);
+		String rootPath = filesDir.toString();
+		String requestPath = packet.getPath();
+		if (!requestPath.equals("")) {
+			filesDir = filesDir.resolve(packet.getPath());
+		}
+		try {
+			FilesListPacket response = new FilesListPacket();
+			response.setFolder(filesDir.toString().replace(rootPath, "." + FileSystems.getDefault().getSeparator()));
+			List<FileInfo> filesNames = Files.list(filesDir).map(FileInfo::new)
+					.collect(Collectors.toList());
+			response.addAll(filesNames);
+			ctx.writeAndFlush(response);
+		} catch (Exception ex) {
+			logger.error(ex.getLocalizedMessage(), ex);
+			ctx.writeAndFlush("Folder not found.");
 		}
 	}
 

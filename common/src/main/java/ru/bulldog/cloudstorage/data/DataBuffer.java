@@ -58,6 +58,20 @@ public class DataBuffer extends ByteBuf {
 		return new UUID(mostBits, leastBits);
 	}
 
+	public DataBuffer writeFileInfo(FileInfo fileInfo) {
+		writeString(fileInfo.getFileName());
+		writeLong(fileInfo.getFileSize());
+		writeBoolean(fileInfo.isDirectory());
+		return this;
+	}
+
+	public FileInfo readFileInfo() {
+		String fileName = readString();
+		long fileSize = readLong();
+		boolean isDir = readBoolean();
+		return new FileInfo(fileName, fileSize, isDir);
+	}
+
 	public DataBuffer merge(ByteBuf source) {
 		capacity(capacity() + source.capacity());
 		writeBytes(source);
