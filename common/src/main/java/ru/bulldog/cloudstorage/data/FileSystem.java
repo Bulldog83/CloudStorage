@@ -8,15 +8,11 @@ import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.FileAttribute;
-import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.attribute.PosixFilePermissions;
-import java.util.Set;
+import java.util.Iterator;
 
 public final class FileSystem {
 
 	private final static Logger logger = LogManager.getLogger(FileSystem.class);
-	private final static FileAttribute<Set<PosixFilePermission>> FOLDER_ATTRIBUTES;
 
 	public final static String PATH_DELIMITER;
 
@@ -24,8 +20,12 @@ public final class FileSystem {
 
 	public static Path createFolder(Path folder, String name) {
 		try {
-			return Files.createDirectory(folder.resolve(name), FOLDER_ATTRIBUTES);
-		} catch (IOException ex) {
+			Path newFolder = folder.resolve(name);
+			if (newFolder.toFile().mkdir()) {
+				return newFolder;
+			}
+			return folder;
+		} catch (Exception ex) {
 			logger.error("Create folder error: " + folder, ex);
 			return folder;
 		}
@@ -41,7 +41,13 @@ public final class FileSystem {
 		try {
 			File toDelete = filePath.toFile();
 			if (toDelete.exists() && toDelete.isDirectory()) {
-				Files.list(filePath).forEach(FileSystem::deleteFile);
+				Iterator<Path> pathIterator = Files.list(filePath).iterator();
+				while (pathIterator.hasNext()) {
+					Path path = pathIterator.next();
+					if (!deleteFile(path)) {
+						return false;
+					}
+				}
 			}
 			return Files.deleteIfExists(filePath);
 		} catch (IOException ex) {
@@ -51,7 +57,6 @@ public final class FileSystem {
 	}
 
 	static {
-		FOLDER_ATTRIBUTES = PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-r-----"));
 		PATH_DELIMITER = FileSystems.getDefault().getSeparator();
 	}
 }

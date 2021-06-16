@@ -11,6 +11,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import ru.bulldog.cloudstorage.Settings;
 import ru.bulldog.cloudstorage.event.ActionListener;
 import ru.bulldog.cloudstorage.event.EventsHandler;
 import ru.bulldog.cloudstorage.network.ClientNetworkHandler;
@@ -62,6 +63,11 @@ public class AuthController implements Initializable {
 				Platform.runLater(() -> labStatus.setText("Error: " + message));
 			}
 		});
+		if (Settings.isSaveAuthData()) {
+			rememberPassword.setSelected(true);
+			emailField.setText(Settings.getAuthLogin());
+			passwordField.setText(Settings.getAuthPassword());
+		}
 	}
 
 	public void doConnect(ActionEvent actionEvent) {
@@ -77,6 +83,11 @@ public class AuthController implements Initializable {
 		}
 		labStatus.setText("");
 		networkHandler.connect(new AuthData(email, password));
+		if (rememberPassword.isSelected()) {
+			Settings.saveAuthData(email, password);
+		} else {
+			Settings.saveAuthLogin(email);
+		}
 	}
 
 	public void doRegistration(ActionEvent actionEvent) {
@@ -111,5 +122,9 @@ public class AuthController implements Initializable {
 		authPane.setVisible(true);
 		registerPane.setVisible(false);
 		authStage.setTitle("Authorization");
+	}
+
+	public void onSavePasswordChange(ActionEvent actionEvent) {
+		Settings.setSaveAuthData(rememberPassword.isSelected());
 	}
 }

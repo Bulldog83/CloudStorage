@@ -51,6 +51,9 @@ public class MainController implements Initializable, AutoCloseable {
 
 	private final static Logger logger = LogManager.getLogger(MainController.class);
 
+	private final static ButtonType BUTTON_CANCEL = new ButtonType("Cancel", ButtonBar.ButtonData.RIGHT);
+	private final static ButtonType BUTTON_YES = new ButtonType("Yes", ButtonBar.ButtonData.RIGHT);
+
 	@FXML
 	public AnchorPane mainWindow;
 	@FXML
@@ -113,6 +116,7 @@ public class MainController implements Initializable, AutoCloseable {
 	private Stage mainStage;
 	private Stage authStage;
 	private Path filesDir;
+	private Alert confirm;
 	private Alert alert;
 
 	private void sendFile(FileInfo fileInfo) {
@@ -251,13 +255,7 @@ public class MainController implements Initializable, AutoCloseable {
 							networkHandler.sendPacket(packet);
 						}
 					} else {
-						File file = fileInfo.getSourceFile();
-						if (file.isDirectory()) {
-							FileSystem.renameFile(file.toPath(), "", newName);
-						} else {
-							Path folder = file.toPath().getParent();
-							FileSystem.renameFile(folder, fileInfo.getFileName(), newName);
-						}
+						FileSystem.renameFile(filesDir, fileInfo.getFileName(), newName);
 						refreshClientFiles();
 					}
 				});
@@ -305,6 +303,28 @@ public class MainController implements Initializable, AutoCloseable {
 	}
 
 	public void doDelete(Event actionEvent) {
+		if (activeTable != null) {
+			FileInfo fileInfo = activeTable.getSelectionModel().getSelectedItem();
+			if (fileInfo != null) {
+				String fileName = fileInfo.getFileName();
+				confirm.setContentText("Do you want to delete " + fileName + "?\n" +
+						"The directories will be deleted along with all their contents.\nThis action is irreversible.");
+				Optional<ButtonType> result = confirm.showAndWait();
+				result.ifPresent(buttonType -> {
+					if (buttonType == BUTTON_YES) {
+						if (activeTable == serverFiles) {
+							if (checkConnection()) {
+								ActionPacket packet = ActionPacket.deleteFile(fileName);
+								networkHandler.sendPacket(packet);
+							}
+						} else {
+							FileSystem.deleteFile(filesDir.resolve(fileName));
+							refreshClientFiles();
+						}
+					}
+				});
+			}
+		}
 	}
 
 	private void requestFile(FileInfo fileInfo) {
@@ -385,15 +405,18 @@ public class MainController implements Initializable, AutoCloseable {
 
 	@Override
 	public void initialize(URL location, ResourceBundle resources) {
+		this.confirm = new Alert(AlertType.CONFIRMATION, "", BUTTON_YES, BUTTON_CANCEL);
+		this.alert = new Alert(AlertType.INFORMATION);
 		this.filesDir = Paths.get("").toAbsolutePath();
 		this.networkHandler = new ClientNetworkHandler(this);
 		this.eventsHandler = EventsHandler.getInstance();
 		this.directoryChooser = new DirectoryChooser();
 		this.inputDialog = new TextInputDialog();
-		this.alert = new Alert(AlertType.INFORMATION);
 		this.activeTable = clientFiles;
+		inputDialog.setHeaderText("New File/Folder name");
 		directoryChooser.setTitle("Choose directory");
 		clientPath.setText(filesDir.toString());
+		confirm.setTitle("Delete File/Folder");
 		alert.setTitle("Message");
 
 		this.clientFilesList = FXCollections.observableArrayList();

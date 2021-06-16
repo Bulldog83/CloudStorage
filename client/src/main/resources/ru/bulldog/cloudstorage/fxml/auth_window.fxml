@@ -30,7 +30,7 @@
       </GridPane>
       <VBox fx:id="authPane" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="105.0">
          <children>
-            <CheckBox fx:id="rememberPassword" mnemonicParsing="false" text="Remember password">
+            <CheckBox fx:id="rememberPassword" mnemonicParsing="false" onAction="#onSavePasswordChange" text="Remember password">
                <VBox.margin>
                   <Insets left="105.0" top="5.0" />
                </VBox.margin>

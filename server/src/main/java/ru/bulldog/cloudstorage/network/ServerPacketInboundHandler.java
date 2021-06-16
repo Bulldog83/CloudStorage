@@ -77,20 +77,20 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 					String fileName = packet.getName();
 					String newName = packet.getNewName();
 					if (FileSystem.renameFile(filesDir, fileName, newName)) {
-						ctx.writeAndFlush(String.format("File %s successfully renamed: %s", fileName, newName));
+						ctx.writeAndFlush(String.format("File/directory %s successfully renamed to: %s", fileName, newName));
 						ctx.writeAndFlush(new FilesListPacket());
 					} else {
-						ctx.writeAndFlush("Can't rename file: " + fileName);
+						ctx.writeAndFlush("Can't rename file/directory: " + fileName);
 					}
 					break;
 				case DELETE:
 					fileName = packet.getName();
 					Path toDelete = filesDir.resolve(fileName);
 					if (FileSystem.deleteFile(toDelete)) {
-						ctx.writeAndFlush("File successfully deleted: " + fileName);
+						ctx.writeAndFlush("File/directory successfully deleted: " + fileName);
 						ctx.writeAndFlush(new FilesListPacket());
 					} else {
-						ctx.writeAndFlush("Can't delete file: " + fileName);
+						ctx.writeAndFlush("Can't delete file/directory: " + fileName);
 					}
 					break;
 				default:
@@ -107,11 +107,13 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 			Path rootPath = session.getRootFolder();
 			String requestPath = packet.getPath();
 			if (packet.isParent()) {
-				Path parentPath = filesDir.getParent();
-				if (parentPath.equals(rootPath)) {
-					filesDir = rootPath;
-				} else {
-					filesDir = parentPath;
+				if (!filesDir.equals(rootPath)) {
+					Path parentPath = filesDir.getParent();
+					if (parentPath.equals(rootPath)) {
+						filesDir = rootPath;
+					} else {
+						filesDir = parentPath;
+					}
 				}
 			} else {
 				if (!requestPath.equals("")) {
@@ -119,17 +121,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 				}
 			}
 			session.setActiveFolder(filesDir);
-			try {
-				FilesListPacket response = new FilesListPacket();
-				response.setFolder(filesDir.toString().replace(rootPath.toString(), "." + FileSystem.PATH_DELIMITER));
-				List<FileInfo> filesNames = Files.list(filesDir).map(FileInfo::new)
-						.collect(Collectors.toList());
-				response.addAll(filesNames);
-				ctx.writeAndFlush(response);
-			} catch (Exception ex) {
-				logger.error(ex.getLocalizedMessage(), ex);
-				ctx.writeAndFlush("Folder not found.");
-			}
+			ctx.writeAndFlush(new FilesListPacket());
 		}
 	}
 
@@ -178,7 +170,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		Session session = networkHandler.getSession(sessionId);
 		if (session != null) {
 			String fileName = packet.getName();
-			File file = networkHandler.getFilesDir(sessionId).resolve(fileName).toFile();
+			File file = session.getActiveFolder().resolve(fileName).toFile();
 			if (file.exists()) {
 				logger.warn("File exists: " + file + ". Will recreate file.");
 				file.delete();
@@ -199,17 +191,17 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		channel.attr(ChannelAttributes.FILE_CHANNEL).set(true);
 		String fileName = packet.getName();
 		UUID sessionId = channel.attr(ChannelAttributes.SESSION_KEY).get();
-		Optional<Path> filePath = Files.list(networkHandler.getFilesDir(sessionId))
-				.filter(path -> fileName.equals(path.toFile().getName())).findFirst();
-		if (filePath.isPresent()) {
-			FilePacket filePacket = new FilePacket(packet.getSession(), filePath.get());
-			ctx.writeAndFlush(filePacket);
-		} else {
-			Session session = networkHandler.getSession(sessionId);
-			if (session != null) {
+		Session session = networkHandler.getSession(sessionId);
+		if (session != null) {
+			Optional<Path> filePath = Files.list(session.getActiveFolder())
+					.filter(path -> fileName.equals(path.toFile().getName())).findFirst();
+			if (filePath.isPresent()) {
+				FilePacket filePacket = new FilePacket(packet.getSession(), filePath.get());
+				ctx.writeAndFlush(filePacket);
+			} else {
 				session.getConnection().sendMessage("File not found.");
+				channel.close();
 			}
-			channel.close();
 		}
 	}
 }

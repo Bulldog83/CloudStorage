@@ -9,9 +9,9 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.Settings;
 import ru.bulldog.cloudstorage.event.EventsHandler;
 import ru.bulldog.cloudstorage.gui.controllers.MainController;
-import ru.bulldog.cloudstorage.network.handlers.StringInboundHandler;
 import ru.bulldog.cloudstorage.network.packet.AuthData;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 import ru.bulldog.cloudstorage.network.packet.ReceivingFile;
@@ -23,15 +23,12 @@ import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public class ClientNetworkHandler {
 
 	private static final Logger logger = LogManager.getLogger(ClientNetworkHandler.class);
-	private final static String host;
-	private final static int port;
 
 	private final ThreadManager threadManager;
 	private final EventsHandler eventsHandler;
@@ -51,7 +48,7 @@ public class ClientNetworkHandler {
 		this.worker = new NioEventLoopGroup();
 		this.bootstrap = new Bootstrap();
 		bootstrap.group(worker)
-				.remoteAddress(host, port)
+				.remoteAddress(Settings.HOST, Settings.PORT)
 				.channelFactory(NioSocketChannel::new)
 				.option(ChannelOption.SO_KEEPALIVE, true)
 				.handler(new ChannelInitializer<SocketChannel>() {
@@ -156,12 +153,6 @@ public class ClientNetworkHandler {
 
 	public void sendPacket(Packet packet) {
 		connection.sendPacket(packet);
-	}
-
-	static {
-		Properties properties = System.getProperties();
-		host = properties.getProperty("server.host", "localhost");
-		port = (int) properties.getOrDefault("server.port", 8072);
 	}
 
 	public boolean isConnected() {
