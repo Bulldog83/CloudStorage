@@ -7,11 +7,13 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.data.DataBuffer;
 import ru.bulldog.cloudstorage.data.FileInfo;
+import ru.bulldog.cloudstorage.data.FileSystem;
 import ru.bulldog.cloudstorage.network.handlers.PacketOutboundHandler;
 import ru.bulldog.cloudstorage.network.packet.FilePacket;
 import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -46,13 +48,14 @@ public class ServerPacketOutboundHandler extends PacketOutboundHandler {
 	private void handleFilesList(ChannelHandlerContext ctx, FilesListPacket packet) {
 		try {
 			UUID sessionId = ctx.channel().attr(ChannelAttributes.SESSION_KEY).get();
-			Path filesDir = networkHandler.getFilesDir(sessionId);
-			String rootPath = filesDir.toString();
-			packet.setFolder(rootPath.replace(rootPath, ".\\"));
+			Session session = networkHandler.getSession(sessionId);
+			String rootPath = session.getRootFolder().toString();
+			Path filesDir = session.getActiveFolder();
+			packet.setFolder(filesDir.toString().replace(rootPath, "." + FileSystem.PATH_DELIMITER));
 			List<FileInfo> filesNames = Files.list(filesDir).map(FileInfo::new).collect(Collectors.toList());
 			packet.addAll(filesNames);
 		} catch (Exception ex) {
-			logger.error(ex.getLocalizedMessage(), ex);
+			logger.error(ex.getMessage(), ex);
 		}
 	}
 

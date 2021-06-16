@@ -7,6 +7,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.SortedList;
 import javafx.event.ActionEvent;
+import javafx.event.Event;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
@@ -16,6 +17,7 @@ import javafx.scene.control.*;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.DirectoryChooser;
@@ -26,9 +28,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.Client;
 import ru.bulldog.cloudstorage.data.FileInfo;
+import ru.bulldog.cloudstorage.data.FileSystem;
 import ru.bulldog.cloudstorage.event.ActionListener;
 import ru.bulldog.cloudstorage.event.EventsHandler;
-import ru.bulldog.cloudstorage.event.FilesListener;
 import ru.bulldog.cloudstorage.network.ClientNetworkHandler;
 import ru.bulldog.cloudstorage.network.Session;
 import ru.bulldog.cloudstorage.network.packet.*;
@@ -42,15 +44,17 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.ResourceBundle;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class MainController implements Initializable, AutoCloseable {
 
 	private final static Logger logger = LogManager.getLogger(MainController.class);
 
+	@FXML
+	public AnchorPane mainWindow;
+	@FXML
+	public AnchorPane transferPane;
 	@FXML
 	public TableView<FileInfo> clientFiles;
 	@FXML
@@ -60,8 +64,6 @@ public class MainController implements Initializable, AutoCloseable {
 	@FXML
 	public TextField serverPath;
 	@FXML
-	public AnchorPane transferPane;
-	@FXML
 	public ProgressBar transferProgress;
 	@FXML
 	public Label progressValue;
@@ -70,7 +72,7 @@ public class MainController implements Initializable, AutoCloseable {
 	@FXML
 	public Label transferFile;
 	@FXML
-	public AnchorPane mainWindow;
+	public Label labCopyTo;
 	@FXML
 	public TableColumn<FileInfo, String> clientFileName;
 	@FXML
@@ -89,10 +91,21 @@ public class MainController implements Initializable, AutoCloseable {
 	public Button btnFileUpload;
 	@FXML
 	public Button btnFileDownload;
+	@FXML
+	public Button btnDoCopy;
+	@FXML
+	public Button btnDoRename;
+	@FXML
+	public Button btnCreateFolder;
+	@FXML
+	public Button btnDoDelete;
 
 	private ObservableList<FileInfo> clientFilesList;
 	private ObservableList<FileInfo> serverFilesList;
 
+	private TableView<FileInfo> activeTable;
+
+	private TextInputDialog inputDialog;
 	private DirectoryChooser directoryChooser;
 	private ClientNetworkHandler networkHandler;
 	private AuthController authController;
@@ -102,18 +115,15 @@ public class MainController implements Initializable, AutoCloseable {
 	private Path filesDir;
 	private Alert alert;
 
-	public void sendFile(ActionEvent actionEvent) {
+	private void sendFile(FileInfo fileInfo) {
 		if (checkConnection()) {
-			FileInfo fileInfo = clientFiles.getSelectionModel().getSelectedItem();
-			if (fileInfo != null && !fileInfo.isDirectory()) {
-				File file = fileInfo.getSourceFile();
-				try {
-					Session session = networkHandler.getSession();
-					FilePacket packet = new FilePacket(session.getSessionId(), file.toPath());
-					networkHandler.sendPacket(packet);
-				} catch (Exception ex) {
-					logger.error("Send file error: " + file, ex);
-				}
+			File file = fileInfo.getSourceFile();
+			try {
+				Session session = networkHandler.getSession();
+				FilePacket packet = new FilePacket(session.getSessionId(), file.toPath());
+				networkHandler.sendPacket(packet);
+			} catch (Exception ex) {
+				logger.error("Send file error: " + file, ex);
 			}
 		}
 	}
@@ -143,21 +153,39 @@ public class MainController implements Initializable, AutoCloseable {
 		}
 	}
 
-	public void onServerFileClicked(MouseEvent mouseEvent) {
-		if (mouseEvent.getClickCount() == 2) {
-			FileInfo selected = clientFiles.getSelectionModel().getSelectedItem();
-			if (selected != null && selected.isDirectory()) {
-				requestFile(selected);
-			}
-		}
+	public void onServerFilesClicked(MouseEvent mouseEvent) {
+		activeTable = serverFiles;
+		labCopyTo.setText("Download");
+		onTableClicked(mouseEvent);
 	}
 
-	public void onClientFileClicked(MouseEvent mouseEvent) {
-		if (mouseEvent.getClickCount() == 2) {
-			FileInfo selected = clientFiles.getSelectionModel().getSelectedItem();
-			if (selected != null && selected.isDirectory()) {
-				updateFolder(filesDir.resolve(selected.getFileName()));
+	public void onClientFilesClicked(MouseEvent mouseEvent) {
+		activeTable = clientFiles;
+		labCopyTo.setText("Upload");
+		onTableClicked(mouseEvent);
+	}
+
+	public void onTableClicked(MouseEvent mouseEvent) {
+		FileInfo selected = activeTable.getSelectionModel().getSelectedItem();
+		if (selected == null) {
+			btnDoCopy.setDisable(true);
+			btnDoDelete.setDisable(true);
+			btnDoRename.setDisable(true);
+		} else if (selected.isDirectory()) {
+			if (mouseEvent.getClickCount() == 2) {
+				if (activeTable == clientFiles) {
+					updateFolder(filesDir.resolve(selected.getFileName()));
+				} else {
+					requestFile(selected);
+				}
 			}
+			btnDoCopy.setDisable(true);
+			btnDoDelete.setDisable(false);
+			btnDoRename.setDisable(false);
+		} else {
+			btnDoCopy.setDisable(false);
+			btnDoDelete.setDisable(false);
+			btnDoRename.setDisable(false);
 		}
 	}
 
@@ -169,7 +197,114 @@ public class MainController implements Initializable, AutoCloseable {
 	}
 
 	public void serverFolderUp(ActionEvent actionEvent) {
+		if (checkConnection()) {
+			try {
+				Packet packet = new ListRequest("", true);
+				networkHandler.sendPacket(packet);
+			} catch (Exception ex) {
+				logger.warn("Parent folder request error", ex);
+			}
+		}
+	}
 
+	public void onKeyPressed(KeyEvent keyEvent) {
+		switch (keyEvent.getCode()) {
+			case F4:
+				doRename(keyEvent);
+				break;
+			case F5:
+				doCopy(keyEvent);
+				break;
+			case F7:
+				createFolder(keyEvent);
+				break;
+			case F8:
+				doDelete(keyEvent);
+				break;
+		}
+	}
+
+	public void doRename(Event actionEvent) {
+		if (activeTable != null) {
+			FileInfo fileInfo = activeTable.getSelectionModel().getSelectedItem();
+			if (fileInfo != null) {
+				inputDialog.setTitle("Rename File");
+				inputDialog.setContentText("Enter new file/folder name");
+				Optional<String> optionalName = inputDialog.showAndWait();
+				optionalName.ifPresent(name -> {
+					String newName = name.trim();
+					if (newName.equals("")) {
+						alert.setContentText("Name can't be empty.");
+						alert.setAlertType(AlertType.WARNING);
+						alert.showAndWait();
+						return;
+					}
+					if (newName.equals(fileInfo.getFileName())) {
+						alert.setContentText("New name the same as exist.");
+						alert.setAlertType(AlertType.WARNING);
+						alert.showAndWait();
+						return;
+					}
+					if (activeTable == serverFiles) {
+						if (checkConnection()) {
+							ActionPacket packet = ActionPacket.renameFile(fileInfo.getFileName(), newName);
+							networkHandler.sendPacket(packet);
+						}
+					} else {
+						File file = fileInfo.getSourceFile();
+						if (file.isDirectory()) {
+							FileSystem.renameFile(file.toPath(), "", newName);
+						} else {
+							Path folder = file.toPath().getParent();
+							FileSystem.renameFile(folder, fileInfo.getFileName(), newName);
+						}
+						refreshClientFiles();
+					}
+				});
+			}
+		}
+	}
+
+	public void doCopy(Event actionEvent) {
+		if (activeTable != null && checkConnection()) {
+			FileInfo fileInfo = activeTable.getSelectionModel().getSelectedItem();
+			if (fileInfo != null && !fileInfo.isDirectory()) {
+				if (activeTable == serverFiles) {
+					requestFile(fileInfo);
+				} else {
+					sendFile(fileInfo);
+				}
+			}
+		}
+	}
+
+	public void createFolder(Event actionEvent) {
+		if (activeTable != null) {
+			inputDialog.setTitle("New Directory");
+			inputDialog.setContentText("Enter new file/folder name");
+			Optional<String> optionalName = inputDialog.showAndWait();
+			optionalName.ifPresent(name -> {
+				String folderName = name.trim();
+				if (folderName.equals("")) {
+					alert.setContentText("Name can't be empty.");
+					alert.setAlertType(AlertType.WARNING);
+					alert.showAndWait();
+					return;
+				}
+				if (activeTable == serverFiles) {
+					if (checkConnection()) {
+						ActionPacket packet = ActionPacket.createFolder(folderName);
+						networkHandler.sendPacket(packet);
+					}
+				} else {
+					FileSystem.createFolder(filesDir, folderName);
+					refreshClientFiles();
+				}
+			});
+		}
+	}
+
+	public void doDelete(Event actionEvent) {
 	}
 
 	private void requestFile(FileInfo fileInfo) {
@@ -178,7 +313,7 @@ public class MainController implements Initializable, AutoCloseable {
 				Session session = networkHandler.getSession();
 				Packet packet;
 				if (fileInfo.isDirectory()) {
-					packet = new ListRequest(fileInfo.getFileName());
+					packet = new ListRequest(fileInfo.getFileName(), false);
 				} else {
 					packet = new FileRequest(session.getSessionId(), fileInfo.getFileName());
 				}
@@ -186,6 +321,13 @@ public class MainController implements Initializable, AutoCloseable {
 			} catch (Exception ex) {
 				logger.warn("Request file error: " + fileInfo, ex);
 			}
+		}
+	}
+
+	public void sendFile(ActionEvent actionEvent) {
+		FileInfo fileInfo = clientFiles.getSelectionModel().getSelectedItem();
+		if (fileInfo != null && !fileInfo.isDirectory()) {
+			sendFile(fileInfo);
 		}
 	}
 
@@ -244,13 +386,15 @@ public class MainController implements Initializable, AutoCloseable {
 	@Override
 	public void initialize(URL location, ResourceBundle resources) {
 		this.filesDir = Paths.get("").toAbsolutePath();
+		this.networkHandler = new ClientNetworkHandler(this);
+		this.eventsHandler = EventsHandler.getInstance();
 		this.directoryChooser = new DirectoryChooser();
-		directoryChooser.setTitle("Choose directory");
+		this.inputDialog = new TextInputDialog();
 		this.alert = new Alert(AlertType.INFORMATION);
-		alert.setTitle("Message");
+		this.activeTable = clientFiles;
+		directoryChooser.setTitle("Choose directory");
 		clientPath.setText(filesDir.toString());
-		networkHandler = new ClientNetworkHandler(this);
-		eventsHandler = EventsHandler.getInstance();
+		alert.setTitle("Message");
 
 		this.clientFilesList = FXCollections.observableArrayList();
 		SortedList<FileInfo> clientSorted = new SortedList<>(clientFilesList);
@@ -261,7 +405,7 @@ public class MainController implements Initializable, AutoCloseable {
 		serverSorted.setComparator(FILE_INFO_COMPARATOR);
 		serverFiles.setItems(serverSorted);
 
-		registerConnectionListener();
+		registerEventListeners();
 		refreshClientFiles();
 		initFileTables();
 		loadIcons();
@@ -286,8 +430,6 @@ public class MainController implements Initializable, AutoCloseable {
 				logger.error("Auth window initialization error.", ex);
 			}
 		});
-
-
 	}
 
 	private void initFileTables() {
@@ -295,10 +437,10 @@ public class MainController implements Initializable, AutoCloseable {
 		decimalFormat.setGroupingUsed(true);
 		ReadOnlyObjectWrapper<String> strDir = new ReadOnlyObjectWrapper<>("[DIR]");
 
-		Callback<TableColumn.CellDataFeatures<FileInfo, String>, ObservableValue<String>> fileNameCell = columnData ->
-				new ReadOnlyObjectWrapper<>(columnData.getValue().getFileName());
-		Callback<TableColumn.CellDataFeatures<FileInfo, String>, ObservableValue<String>> fileSizeCell = columnData -> {
-			FileInfo fileInfo = columnData.getValue();
+		Callback<TableColumn.CellDataFeatures<FileInfo, String>, ObservableValue<String>> fileNameCell = column ->
+				new ReadOnlyObjectWrapper<>(column.getValue().getFileName());
+		Callback<TableColumn.CellDataFeatures<FileInfo, String>, ObservableValue<String>> fileSizeCell = column -> {
+			FileInfo fileInfo = column.getValue();
 			if (fileInfo.isDirectory()) {
 				return strDir;
 			}
@@ -307,9 +449,41 @@ public class MainController implements Initializable, AutoCloseable {
 		};
 
 		clientFileName.setCellValueFactory(fileNameCell);
-		serverFileName.setCellValueFactory(fileNameCell);
 		clientFileSize.setCellValueFactory(fileSizeCell);
+		serverFileName.setCellValueFactory(fileNameCell);
 		serverFileSize.setCellValueFactory(fileSizeCell);
+
+		Callback<TableView<FileInfo>, TableRow<FileInfo>> fileInfoRowFactory = table -> {
+			ContextMenu rowMenu = new ContextMenu();
+			MenuItem copyItem = new MenuItem();
+			MenuItem renameItem = new MenuItem("Rename");
+			MenuItem deleteItem = new MenuItem("Delete");
+			copyItem.setText(table == clientFiles ? "Upload" : "Download");
+			copyItem.setOnAction(this::doCopy);
+			renameItem.setOnAction(this::doRename);
+			deleteItem.setOnAction(this::doDelete);
+
+			TableRow<FileInfo> tableRow = new TableRow<FileInfo>() {
+				@Override
+				protected void updateItem(FileInfo item, boolean empty) {
+					super.updateItem(item, empty);
+					List<MenuItem> menuItems = rowMenu.getItems();
+					menuItems.clear();
+					if (!empty && item != null) {
+						if (!item.isDirectory()) {
+							menuItems.add(copyItem);
+						}
+						menuItems.add(renameItem);
+						menuItems.add(deleteItem);
+					}
+				}
+			};
+			tableRow.setContextMenu(rowMenu);
+
+			return tableRow;
+		};
+		clientFiles.setRowFactory(fileInfoRowFactory);
+		serverFiles.setRowFactory(fileInfoRowFactory);
 	}
 
 	private void loadIcons() {
@@ -370,27 +544,8 @@ public class MainController implements Initializable, AutoCloseable {
 		}
 	}
 
-	private void registerConnectionListener() {
-		eventsHandler.registerListener(new ActionListener() {
-			@Override
-			public void onMessageReceived(String message) {}
-
-			@Override
-			public void onHandleError(String message) {}
-
-			@Override
-			public void onDisconnect() {}
-
-			@Override
-			public void onConnect() {
-				Platform.runLater(authStage::hide);
-				registerFileListener();
-			}
-		});
-	}
-
-	private void registerFileListener() {
-		eventsHandler.registerListener(new FilesListener() {
+	private void registerEventListeners() {
+		ActionListener runtimeListener = new ActionListener() {
 			@Override
 			public void onFilesList(FilesListPacket filesList) {
 				Platform.runLater(() -> {
@@ -432,17 +587,23 @@ public class MainController implements Initializable, AutoCloseable {
 					alert.setAlertType(AlertType.ERROR);
 					alert.setContentText(message);
 					alert.showAndWait();
-				});}
+				});
+			}
+		};
+		ActionListener connectionListener = new ActionListener() {
+			@Override
+			public void onConnect() {
+				Platform.runLater(authStage::hide);
+				eventsHandler.registerListener(runtimeListener);
+			}
 
 			@Override
 			public void onDisconnect() {
 				Platform.runLater(authStage::show);
-				eventsHandler.removeListener(this);
+				eventsHandler.removeListener(runtimeListener);
 			}
-
-			@Override
-			public void onConnect() {}
-		});
+		};
+		eventsHandler.registerListener(connectionListener);
 	}
 
 	@Override

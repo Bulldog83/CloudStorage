@@ -1,8 +1,10 @@
 package ru.bulldog.cloudstorage.network;
 
+import com.google.common.collect.Maps;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelId;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -10,8 +12,7 @@ import ru.bulldog.cloudstorage.data.DataBuffer;
 import ru.bulldog.cloudstorage.event.EventsHandler;
 import ru.bulldog.cloudstorage.network.packet.Packet;
 
-import java.net.SocketAddress;
-import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Optional;
 
 public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
@@ -20,7 +21,7 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 
 	private final ClientNetworkHandler networkHandler;
 	private final EventsHandler eventsHandler;
-	private DataBuffer tempBuffer;
+	private final Map<ChannelId, DataBuffer> channelBuffers = Maps.newConcurrentMap();
 
 	public ClientInboundHandler(ClientNetworkHandler networkHandler) {
 		this.eventsHandler = EventsHandler.getInstance();
@@ -40,8 +41,9 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-		DataBuffer buffer = getBuffer((ByteBuf) msg);
 		Channel channel = ctx.channel();
+		ChannelId channelId = channel.id();
+		DataBuffer buffer = getBuffer(channelId, (ByteBuf) msg);
 		if (channel.attr(ChannelAttributes.FILE_CHANNEL).get()) {
 			Session session = networkHandler.getSession();
 			FileConnection fileConnection = session.getFileChannel(channel.id());
@@ -56,16 +58,15 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 						if (packet.getType().isFile()) {
 							return;
 						}
-						buffer.markReaderIndex();
 					} else {
 						buffer.resetReaderIndex();
 						ctx.fireChannelRead(buffer.readString());
-						buffer.markReaderIndex();
-						break;
 					}
+					buffer.markReaderIndex();
 				} catch (Exception ex) {
 					buffer.resetReaderIndex();
-					tempBuffer = new DataBuffer(ctx.alloc(), buffer.readableBytes());
+					DataBuffer tempBuffer = new DataBuffer(ctx.alloc(), buffer.readableBytes());
+					channelBuffers.put(channelId, tempBuffer);
 					buffer.readBytes(tempBuffer);
 					break;
 				}
@@ -79,10 +80,10 @@ public class ClientInboundHandler extends ChannelInboundHandlerAdapter {
 		logger.warn("Connection error", cause);
 	}
 
-	private DataBuffer getBuffer(ByteBuf msg) {
-		if (tempBuffer != null) {
-			DataBuffer buffer = tempBuffer.merge(msg);
-			tempBuffer = null;
+	private DataBuffer getBuffer(ChannelId channelId, ByteBuf msg) {
+		if (channelBuffers.containsKey(channelId)) {
+			DataBuffer buffer = channelBuffers.get(channelId).merge(msg);
+			channelBuffers.remove(channelId);
 			return buffer;
 		}
 		return new DataBuffer(msg);

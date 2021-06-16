@@ -11,7 +11,6 @@ import ru.bulldog.cloudstorage.network.packet.*;
 import ru.bulldog.cloudstorage.network.packet.Packet.PacketType;
 
 import java.net.SocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -78,7 +77,7 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 				Packet packet = optionalPacket.get();
 				if (packet.getType() == PacketType.AUTH_DATA ||
 					packet.getType() == PacketType.SESSION ||
-					packet.getType() == PacketType.USER_DATA)
+					packet.getType() == PacketType.REGISTRATION_DATA)
 				{
 					ctx.fireChannelRead(packet);
 					return;

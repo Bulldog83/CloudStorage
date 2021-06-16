@@ -7,12 +7,12 @@ public class RegistrationData extends AuthData {
 	private final String nickname;
 
 	public RegistrationData(String email, String password, String nickname) {
-		super(PacketType.USER_DATA, email, password);
+		super(PacketType.REGISTRATION_DATA, email, password);
 		this.nickname = nickname;
 	}
 
 	public RegistrationData(DataBuffer buffer) {
-		super(PacketType.USER_DATA, buffer);
+		super(PacketType.REGISTRATION_DATA, buffer);
 		this.nickname = buffer.readString();
 	}
 

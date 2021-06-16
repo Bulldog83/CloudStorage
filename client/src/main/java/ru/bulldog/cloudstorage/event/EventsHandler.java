@@ -5,7 +5,7 @@ import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 
 import java.util.Set;
 
-public final class EventsHandler implements FilesListener {
+public final class EventsHandler implements ActionListener {
 
 	private static EventsHandler instance;
 
@@ -53,37 +53,21 @@ public final class EventsHandler implements FilesListener {
 
 	@Override
 	public void onFileReceived() {
-		registeredListeners.forEach(listener -> {
-			if (listener.isHandleFiles()) {
-				((FilesListener) listener).onFileReceived();
-			}
-		});
+		registeredListeners.forEach(ActionListener::onFileReceived);
 	}
 
 	@Override
 	public void onFilesList(FilesListPacket filesList) {
-		registeredListeners.forEach(listener -> {
-			if (listener.isHandleFiles()) {
-				((FilesListener) listener).onFilesList(filesList);
-			}
-		});
+		registeredListeners.forEach(listener -> listener.onFilesList(filesList));
 	}
 
 	@Override
 	public void onFileStart(String direction, String fileName) {
-		registeredListeners.forEach(listener -> {
-			if (listener.isHandleFiles()) {
-				((FilesListener) listener).onFileStart(direction, fileName);
-			}
-		});
+		registeredListeners.forEach(listener -> listener.onFileStart(direction, fileName));
 	}
 
 	@Override
 	public void onFileProgress(double progress) {
-		registeredListeners.forEach(listener -> {
-			if (listener.isHandleFiles()) {
-				((FilesListener) listener).onFileProgress(progress);
-			}
-		});
+		registeredListeners.forEach(listener -> listener.onFileProgress(progress));
 	}
 }

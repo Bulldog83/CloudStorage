@@ -19,7 +19,7 @@ public abstract class Packet implements Serializable {
 	}
 
 	public void write(DataBuffer buffer) throws Exception {
-		buffer.writeByte(type.getIdx());
+		buffer.writeByte(type.idx);
 	}
 
 	public static Optional<Packet> read(DataBuffer buffer) {
@@ -42,8 +42,10 @@ public abstract class Packet implements Serializable {
 					return Optional.of(new AuthRequest());
 				case AUTH_DATA:
 					return Optional.of(new AuthData(buffer));
-				case USER_DATA:
+				case REGISTRATION_DATA:
 					return Optional.of(new RegistrationData(buffer));
+				case ACTION:
+					return Optional.of(new ActionPacket(buffer));
 			}
 		}
 		return Optional.empty();
@@ -70,17 +72,14 @@ public abstract class Packet implements Serializable {
 		SESSION(16),
 		AUTH_REQUEST(17),
 		AUTH_DATA(18),
-		USER_DATA(19),
+		REGISTRATION_DATA(19),
+		ACTION(20),
 		UNKNOWN(-1);
 
 		private final byte idx;
 
 		PacketType(int idx) {
 			this.idx = (byte) idx;
-		}
-
-		public byte getIdx() {
-			return idx;
 		}
 
 		public boolean isValid() {

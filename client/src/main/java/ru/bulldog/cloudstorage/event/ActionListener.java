@@ -1,12 +1,14 @@
 package ru.bulldog.cloudstorage.event;
 
-public interface ActionListener {
-	void onMessageReceived(String message);
-	void onHandleError(String message);
-	void onDisconnect();
-	void onConnect();
+import ru.bulldog.cloudstorage.network.packet.FilesListPacket;
 
-	default boolean isHandleFiles() {
-		return this instanceof FilesListener;
-	}
+public interface ActionListener {
+	default void onFilesList(FilesListPacket filesList) {}
+	default void onFileStart(String direction, String fileName) {}
+	default void onFileProgress(double progress) {}
+	default void onFileReceived() {}
+	default void onMessageReceived(String message) {}
+	default void onHandleError(String message) {}
+	default void onDisconnect() {}
+	default void onConnect() {}
 }

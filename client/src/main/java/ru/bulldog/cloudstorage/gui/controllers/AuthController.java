@@ -51,7 +51,17 @@ public class AuthController implements Initializable {
 	@Override
 	public void initialize(URL location, ResourceBundle resources) {
 		Platform.runLater(() -> authStage = (Stage) authWindow.getScene().getWindow());
-		registerListeners();
+		EventsHandler.getInstance().registerListener(new ActionListener() {
+			@Override
+			public void onMessageReceived(String message) {
+				Platform.runLater(() -> labStatus.setText(message));
+			}
+
+			@Override
+			public void onHandleError(String message) {
+				Platform.runLater(() -> labStatus.setText("Error: " + message));
+			}
+		});
 	}
 
 	public void doConnect(ActionEvent actionEvent) {
@@ -101,25 +111,5 @@ public class AuthController implements Initializable {
 		authPane.setVisible(true);
 		registerPane.setVisible(false);
 		authStage.setTitle("Authorization");
-	}
-
-	private void registerListeners() {
-		EventsHandler.getInstance().registerListener(new ActionListener() {
-			@Override
-			public void onMessageReceived(String message) {
-				Platform.runLater(() -> labStatus.setText(message));
-			}
-
-			@Override
-			public void onHandleError(String message) {
-				Platform.runLater(() -> labStatus.setText("Error: " + message));
-			}
-
-			@Override
-			public void onConnect() {}
-
-			@Override
-			public void onDisconnect() {}
-		});
 	}
 }

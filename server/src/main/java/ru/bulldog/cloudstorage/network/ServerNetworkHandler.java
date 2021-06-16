@@ -119,6 +119,9 @@ public class ServerNetworkHandler implements AutoCloseable {
 		}
 		Session session = new Session(userId, channel);
 		activeSessions.put(userId, session);
+		Path sessionFolder = filesDir.resolve(userId.toString());
+		session.setActiveFolder(sessionFolder);
+		session.setRootFolder(sessionFolder);
 		return session;
 	}
 

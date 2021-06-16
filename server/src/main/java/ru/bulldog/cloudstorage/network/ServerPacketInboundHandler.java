@@ -5,6 +5,7 @@ import io.netty.channel.ChannelHandlerContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.bulldog.cloudstorage.data.FileInfo;
+import ru.bulldog.cloudstorage.data.FileSystem;
 import ru.bulldog.cloudstorage.network.handlers.PacketInboundHandler;
 import ru.bulldog.cloudstorage.network.packet.*;
 
@@ -46,30 +47,89 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 			case SESSION:
 				handleSessionPacket(ctx, (SessionPacket) packet);
 				break;
-			case USER_DATA:
+			case REGISTRATION_DATA:
 				handleNewUser(ctx, (RegistrationData) packet);
 				break;
+			case ACTION:
+				handleActionPacket(ctx, (ActionPacket) packet);
+				break;
+		}
+	}
+
+	private void handleActionPacket(ChannelHandlerContext ctx, ActionPacket packet) {
+		UUID sessionId = ctx.channel().attr(ChannelAttributes.SESSION_KEY).get();
+		Session session = networkHandler.getSession(sessionId);
+		if (session != null) {
+			Path filesDir = session.getActiveFolder();
+			switch (packet.getActionType()) {
+				case FOLDER: {
+					String folderName = packet.getName();
+					Path newFolder = FileSystem.createFolder(filesDir, folderName);
+					if (newFolder.equals(filesDir)) {
+						ctx.writeAndFlush("Can't create directory: " + folderName);
+					} else {
+						ctx.writeAndFlush("Directory successfully created: " + folderName);
+						ctx.writeAndFlush(new FilesListPacket());
+					}
+					break;
+				}
+				case RENAME:
+					String fileName = packet.getName();
+					String newName = packet.getNewName();
+					if (FileSystem.renameFile(filesDir, fileName, newName)) {
+						ctx.writeAndFlush(String.format("File %s successfully renamed: %s", fileName, newName));
+						ctx.writeAndFlush(new FilesListPacket());
+					} else {
+						ctx.writeAndFlush("Can't rename file: " + fileName);
+					}
+					break;
+				case DELETE:
+					fileName = packet.getName();
+					Path toDelete = filesDir.resolve(fileName);
+					if (FileSystem.deleteFile(toDelete)) {
+						ctx.writeAndFlush("File successfully deleted: " + fileName);
+						ctx.writeAndFlush(new FilesListPacket());
+					} else {
+						ctx.writeAndFlush("Can't delete file: " + fileName);
+					}
+					break;
+				default:
+					ctx.writeAndFlush("Invalid action type.");
+			}
 		}
 	}
 
 	private void handleFilesListRequest(ChannelHandlerContext ctx, ListRequest packet) {
 		UUID sessionId = ctx.channel().attr(ChannelAttributes.SESSION_KEY).get();
-		Path filesDir = networkHandler.getFilesDir(sessionId);
-		String rootPath = filesDir.toString();
-		String requestPath = packet.getPath();
-		if (!requestPath.equals("")) {
-			filesDir = filesDir.resolve(packet.getPath());
-		}
-		try {
-			FilesListPacket response = new FilesListPacket();
-			response.setFolder(filesDir.toString().replace(rootPath, "." + FileSystems.getDefault().getSeparator()));
-			List<FileInfo> filesNames = Files.list(filesDir).map(FileInfo::new)
-					.collect(Collectors.toList());
-			response.addAll(filesNames);
-			ctx.writeAndFlush(response);
-		} catch (Exception ex) {
-			logger.error(ex.getLocalizedMessage(), ex);
-			ctx.writeAndFlush("Folder not found.");
+		Session session = networkHandler.getSession(sessionId);
+		if (session != null) {
+			Path filesDir = session.getActiveFolder();
+			Path rootPath = session.getRootFolder();
+			String requestPath = packet.getPath();
+			if (packet.isParent()) {
+				Path parentPath = filesDir.getParent();
+				if (parentPath.equals(rootPath)) {
+					filesDir = rootPath;
+				} else {
+					filesDir = parentPath;
+				}
+			} else {
+				if (!requestPath.equals("")) {
+					filesDir = filesDir.resolve(packet.getPath());
+				}
+			}
+			session.setActiveFolder(filesDir);
+			try {
+				FilesListPacket response = new FilesListPacket();
+				response.setFolder(filesDir.toString().replace(rootPath.toString(), "." + FileSystem.PATH_DELIMITER));
+				List<FileInfo> filesNames = Files.list(filesDir).map(FileInfo::new)
+						.collect(Collectors.toList());
+				response.addAll(filesNames);
+				ctx.writeAndFlush(response);
+			} catch (Exception ex) {
+				logger.error(ex.getLocalizedMessage(), ex);
+				ctx.writeAndFlush("Folder not found.");
+			}
 		}
 	}
 
