@@ -5,15 +5,18 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelId;
 
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 public class Session {
 
-	public final Map<ChannelId, FileConnection> fileChannels = Maps.newHashMap();
-	public final UUID sessionId;
-	public final Connection connection;
+	private final Map<ChannelId, FileConnection> fileChannels = Maps.newHashMap();
+	private final UUID sessionId;
+	private final Connection connection;
+	private Path activeFolder;
+	private Path rootFolder;
 	private boolean closed = false;
 
 	public Session(UUID sessionId, Channel channel) {
@@ -40,6 +43,22 @@ public class Session {
 
 	public FileConnection getFileChannel(ChannelId channelId) {
 		return fileChannels.get(channelId);
+	}
+
+	public Path getRootFolder() {
+		return rootFolder;
+	}
+
+	public void setRootFolder(Path rootFolder) {
+		this.rootFolder = rootFolder;
+	}
+
+	public Path getActiveFolder() {
+		return activeFolder;
+	}
+
+	public void setActiveFolder(Path activeFolder) {
+		this.activeFolder = activeFolder;
 	}
 
 	public void addFileChannel(ChannelId channelId, FileConnection channel) {

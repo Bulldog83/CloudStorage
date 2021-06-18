@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane fx:id="authWindow" prefHeight="300.0" prefWidth="448.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ru.bulldog.cloudstorage.gui.controllers.AuthController">
+   <children>
+      <GridPane hgap="5.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="45.0">
+        <columnConstraints>
+          <ColumnConstraints halignment="RIGHT" hgrow="ALWAYS" percentWidth="25.0" />
+          <ColumnConstraints hgrow="ALWAYS" percentWidth="75.0" />
+        </columnConstraints>
+        <rowConstraints>
+          <RowConstraints prefHeight="30.0" vgrow="SOMETIMES" />
+          <RowConstraints prefHeight="30.0" vgrow="SOMETIMES" />
+        </rowConstraints>
+         <children>
+            <Label alignment="CENTER_RIGHT" text="Email" textAlignment="RIGHT" />
+            <TextField fx:id="emailField" prefHeight="25.0" GridPane.columnIndex="1" />
+            <Label alignment="CENTER_RIGHT" text="Password" textAlignment="RIGHT" GridPane.rowIndex="1" />
+            <PasswordField fx:id="passwordField" prefHeight="25.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+         </children>
+         <padding>
+            <Insets right="10.0" />
+         </padding>
+      </GridPane>
+      <VBox fx:id="authPane" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="105.0">
+         <children>
+            <CheckBox fx:id="rememberPassword" mnemonicParsing="false" onAction="#onSavePasswordChange" text="Remember password">
+               <VBox.margin>
+                  <Insets left="105.0" top="5.0" />
+               </VBox.margin>
+            </CheckBox>
+            <GridPane hgap="5.0">
+              <columnConstraints>
+                <ColumnConstraints halignment="RIGHT" hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
+                <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
+              </columnConstraints>
+              <rowConstraints>
+                <RowConstraints prefHeight="50.0" valignment="BOTTOM" vgrow="SOMETIMES" />
+              </rowConstraints>
+               <children>
+                  <Button mnemonicParsing="false" onAction="#openRegistration" prefWidth="100.0" text="Registration" GridPane.columnIndex="1" />
+                  <Button mnemonicParsing="false" onAction="#doConnect" prefWidth="100.0" text="Connect" />
+               </children>
+            </GridPane>
+         </children>
+      </VBox>
+      <VBox fx:id="registerPane" alignment="TOP_CENTER" visible="false" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="105.0">
+         <children>
+            <GridPane hgap="5.0">
+              <columnConstraints>
+                <ColumnConstraints halignment="RIGHT" hgrow="SOMETIMES" percentWidth="25.0" />
+                <ColumnConstraints hgrow="ALWAYS" percentWidth="75.0" />
+              </columnConstraints>
+              <rowConstraints>
+                <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+                <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES" />
+              </rowConstraints>
+               <children>
+                  <Label alignment="CENTER_RIGHT" prefHeight="17.0" prefWidth="68.0" text="Nickname" textAlignment="RIGHT" GridPane.rowIndex="1" />
+                  <TextField fx:id="nicknameField" prefHeight="25.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                  <Label alignment="CENTER_RIGHT" text="Repeat password" textAlignment="RIGHT" />
+                  <TextField fx:id="passwordRepeat" prefHeight="25.0" GridPane.columnIndex="1" />
+               </children>
+               <padding>
+                  <Insets right="10.0" />
+               </padding>
+            </GridPane>
+            <GridPane hgap="5.0">
+              <columnConstraints>
+                <ColumnConstraints halignment="RIGHT" hgrow="SOMETIMES" />
+                <ColumnConstraints hgrow="SOMETIMES" />
+              </columnConstraints>
+              <rowConstraints>
+                <RowConstraints prefHeight="50.0" valignment="BOTTOM" vgrow="SOMETIMES" />
+              </rowConstraints>
+               <children>
+                  <Button mnemonicParsing="false" onAction="#doRegistration" prefWidth="100.0" text="Registration" />
+                  <Button mnemonicParsing="false" onAction="#doCancel" prefWidth="100.0" text="Cancel" GridPane.columnIndex="1" />
+               </children>
+            </GridPane>
+         </children>
+      </VBox>
+      <Label fx:id="labStatus" alignment="TOP_CENTER" layoutY="255.0" prefHeight="60.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0">
+         <padding>
+            <Insets bottom="5.0" left="5.0" right="5.0" top="10.0" />
+         </padding></Label>
+   </children>
+   <padding>
+      <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+   </padding>
+</AnchorPane>

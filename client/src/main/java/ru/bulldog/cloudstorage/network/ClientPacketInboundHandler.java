@@ -4,6 +4,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.event.EventsHandler;
 import ru.bulldog.cloudstorage.network.handlers.PacketInboundHandler;
 import ru.bulldog.cloudstorage.network.packet.*;
 
@@ -16,8 +17,10 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 	private final static Logger logger = LogManager.getLogger(ClientPacketInboundHandler.class);
 
 	private final ClientNetworkHandler networkHandler;
+	private final EventsHandler eventsHandler;
 
 	public ClientPacketInboundHandler(ClientNetworkHandler networkHandler) {
+		this.eventsHandler = EventsHandler.getInstance();
 		this.networkHandler = networkHandler;
 	}
 
@@ -50,7 +53,7 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 			ctx.channel().attr(ChannelAttributes.SESSION_KEY).set(sessionId);
 			ctx.writeAndFlush(new SessionPacket(sessionId));
 		} else {
-			ctx.writeAndFlush(new UserDataPacket("bulldog@pisem.net", "qwerty", "Bulldog"));
+			ctx.writeAndFlush(networkHandler.getAuthData());
 			logger.debug("Auth data sent to: " + ctx.channel().remoteAddress());
 		}
 	}
@@ -64,15 +67,14 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 	private void handleFileProgress(FileProgressPacket packet) {
 		double progress = packet.getProgress();
 		if (progress < 1.0) {
-			networkHandler.getController().updateProgress(progress);
+			eventsHandler.onFileProgress(progress);
 		} else {
-			networkHandler.getController().stopTransfer();
+			eventsHandler.onFileReceived();
 		}
 	}
 
 	private void handleFilesList(FilesListPacket packet) {
-		List<String> names = packet.getNames();
-		networkHandler.getController().refreshServerFiles(names);
+		eventsHandler.onFilesList(packet);
 	}
 
 	private void handleFilePacket(ChannelHandlerContext ctx, FilePacket packet) throws Exception {
@@ -88,7 +90,7 @@ public class ClientPacketInboundHandler extends PacketInboundHandler {
 		ReceivingFile receivingFile = new ReceivingFile(file, packet.getSize());
 		FileConnection fileConnection = new FileConnection(channel, session.getSessionId(), receivingFile);
 		session.addFileChannel(channel.id(), fileConnection);
-		networkHandler.getController().startTransfer("Download", fileName);
+		eventsHandler.onFileStart("Download", fileName);
 		networkHandler.handleFile(fileConnection, packet.getBuffer());
 	}
 }

@@ -4,15 +4,20 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import ru.bulldog.cloudstorage.data.FileInfo;
+import ru.bulldog.cloudstorage.data.FileSystem;
 import ru.bulldog.cloudstorage.network.handlers.PacketInboundHandler;
 import ru.bulldog.cloudstorage.network.packet.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class ServerPacketInboundHandler extends PacketInboundHandler {
 	private final static Logger logger = LogManager.getLogger(ServerPacketInboundHandler.class);
@@ -28,7 +33,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		logger.debug("Received packet: " + packet);
 		switch (packet.getType()) {
 			case LIST_REQUEST:
-				ctx.writeAndFlush(new FilesListPacket());
+				handleFilesListRequest(ctx, (ListRequest) packet);
 				break;
 			case FILE_REQUEST:
 				handleFileRequest(ctx, (FileRequest) packet);
@@ -42,9 +47,81 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 			case SESSION:
 				handleSessionPacket(ctx, (SessionPacket) packet);
 				break;
-			case USER_DATA:
-				handleNewUser(ctx, (UserDataPacket) packet);
+			case REGISTRATION_DATA:
+				handleNewUser(ctx, (RegistrationData) packet);
 				break;
+			case ACTION:
+				handleActionPacket(ctx, (ActionPacket) packet);
+				break;
+		}
+	}
+
+	private void handleActionPacket(ChannelHandlerContext ctx, ActionPacket packet) {
+		UUID sessionId = ctx.channel().attr(ChannelAttributes.SESSION_KEY).get();
+		Session session = networkHandler.getSession(sessionId);
+		if (session != null) {
+			Path filesDir = session.getActiveFolder();
+			switch (packet.getActionType()) {
+				case FOLDER: {
+					String folderName = packet.getName();
+					Path newFolder = FileSystem.createFolder(filesDir, folderName);
+					if (newFolder.equals(filesDir)) {
+						ctx.writeAndFlush("Can't create directory: " + folderName);
+					} else {
+						ctx.writeAndFlush("Directory successfully created: " + folderName);
+						ctx.writeAndFlush(new FilesListPacket());
+					}
+					break;
+				}
+				case RENAME:
+					String fileName = packet.getName();
+					String newName = packet.getNewName();
+					if (FileSystem.renameFile(filesDir, fileName, newName)) {
+						ctx.writeAndFlush(String.format("File/directory %s successfully renamed to: %s", fileName, newName));
+						ctx.writeAndFlush(new FilesListPacket());
+					} else {
+						ctx.writeAndFlush("Can't rename file/directory: " + fileName);
+					}
+					break;
+				case DELETE:
+					fileName = packet.getName();
+					Path toDelete = filesDir.resolve(fileName);
+					if (FileSystem.deleteFile(toDelete)) {
+						ctx.writeAndFlush("File/directory successfully deleted: " + fileName);
+						ctx.writeAndFlush(new FilesListPacket());
+					} else {
+						ctx.writeAndFlush("Can't delete file/directory: " + fileName);
+					}
+					break;
+				default:
+					ctx.writeAndFlush("Invalid action type.");
+			}
+		}
+	}
+
+	private void handleFilesListRequest(ChannelHandlerContext ctx, ListRequest packet) {
+		UUID sessionId = ctx.channel().attr(ChannelAttributes.SESSION_KEY).get();
+		Session session = networkHandler.getSession(sessionId);
+		if (session != null) {
+			Path filesDir = session.getActiveFolder();
+			Path rootPath = session.getRootFolder();
+			String requestPath = packet.getPath();
+			if (packet.isParent()) {
+				if (!filesDir.equals(rootPath)) {
+					Path parentPath = filesDir.getParent();
+					if (parentPath.equals(rootPath)) {
+						filesDir = rootPath;
+					} else {
+						filesDir = parentPath;
+					}
+				}
+			} else {
+				if (!requestPath.equals("")) {
+					filesDir = filesDir.resolve(packet.getPath());
+				}
+			}
+			session.setActiveFolder(filesDir);
+			ctx.writeAndFlush(new FilesListPacket());
 		}
 	}
 
@@ -67,7 +144,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		}
 	}
 
-	private void handleNewUser(ChannelHandlerContext ctx, UserDataPacket packet) {
+	private void handleNewUser(ChannelHandlerContext ctx, RegistrationData packet) {
 		Optional<UUID> uuidOptional = networkHandler.registerUser(packet.getEmail(), packet.getPassword(), packet.getNickname());
 		if (uuidOptional.isPresent()) {
 			registerSession(ctx, uuidOptional.get());
@@ -93,7 +170,7 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		Session session = networkHandler.getSession(sessionId);
 		if (session != null) {
 			String fileName = packet.getName();
-			File file = networkHandler.getFilesDir(sessionId).resolve(fileName).toFile();
+			File file = session.getActiveFolder().resolve(fileName).toFile();
 			if (file.exists()) {
 				logger.warn("File exists: " + file + ". Will recreate file.");
 				file.delete();
@@ -114,17 +191,17 @@ public class ServerPacketInboundHandler extends PacketInboundHandler {
 		channel.attr(ChannelAttributes.FILE_CHANNEL).set(true);
 		String fileName = packet.getName();
 		UUID sessionId = channel.attr(ChannelAttributes.SESSION_KEY).get();
-		Optional<Path> filePath = Files.list(networkHandler.getFilesDir(sessionId))
-				.filter(path -> fileName.equals(path.toFile().getName())).findFirst();
-		if (filePath.isPresent()) {
-			FilePacket filePacket = new FilePacket(packet.getSession(), filePath.get());
-			ctx.writeAndFlush(filePacket);
-		} else {
-			Session session = networkHandler.getSession(sessionId);
-			if (session != null) {
+		Session session = networkHandler.getSession(sessionId);
+		if (session != null) {
+			Optional<Path> filePath = Files.list(session.getActiveFolder())
+					.filter(path -> fileName.equals(path.toFile().getName())).findFirst();
+			if (filePath.isPresent()) {
+				FilePacket filePacket = new FilePacket(packet.getSession(), filePath.get());
+				ctx.writeAndFlush(filePacket);
+			} else {
 				session.getConnection().sendMessage("File not found.");
+				channel.close();
 			}
-			channel.close();
 		}
 	}
 }

@@ -13,6 +13,8 @@ application {
 
 dependencies {
     implementation project(':common')
+    implementation 'net.java.linoleum:jlfgr:1_0'
+
 }
 
 jar {

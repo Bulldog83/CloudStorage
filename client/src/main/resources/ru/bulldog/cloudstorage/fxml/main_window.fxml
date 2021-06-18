@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.scene.*?>
+<?import javafx.geometry.*?>
 <?import javafx.scene.text.*?>
 <?import java.lang.*?>
 <?import javafx.scene.control.*?>
@@ -7,27 +9,180 @@
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.layout.*?>
 
-<AnchorPane prefHeight="768.0" prefWidth="1280.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ru.bulldog.cloudstorage.gui.controllers.MainController">
+<AnchorPane fx:id="mainWindow" onKeyReleased="#onKeyPressed" prefHeight="768.0" prefWidth="1280.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ru.bulldog.cloudstorage.gui.controllers.MainController">
    <children>
-      <ListView fx:id="clientFiles" layoutX="14.0" layoutY="74.0" prefHeight="683.0" prefWidth="600.0" AnchorPane.bottomAnchor="10.0" AnchorPane.leftAnchor="10.0" />
-      <ListView fx:id="serverFiles" layoutX="656.0" layoutY="50.0" prefHeight="683.0" prefWidth="600.0" AnchorPane.bottomAnchor="10.0" AnchorPane.rightAnchor="10.0" />
-      <Button layoutX="624.0" layoutY="161.0" mnemonicParsing="false" onAction="#sendFile" prefHeight="53.0" prefWidth="33.0" text="&gt;" />
-      <Button layoutX="624.0" layoutY="319.0" mnemonicParsing="false" onAction="#requestFile" prefHeight="53.0" prefWidth="33.0" text="&lt;" />
-      <TextField fx:id="clientPath" layoutX="10.0" layoutY="43.0" onAction="#switchFolder" prefHeight="25.0" prefWidth="570.0" />
-      <TextField fx:id="serverPath" layoutX="670.0" layoutY="43.0" prefHeight="25.0" prefWidth="600.0" />
-      <Button layoutX="584.0" layoutY="43.0" mnemonicParsing="false" onAction="#showFolderDialog" prefHeight="25.0" prefWidth="26.0" text="F" />
-      <MenuBar layoutY="2.0" prefHeight="25.0" prefWidth="1280.0" />
-      <AnchorPane fx:id="transferPane" layoutX="399.0" layoutY="243.0" prefHeight="65.0" prefWidth="530.0" style="-fx-background-color: #f8f8f8;" visible="false">
+      <MenuBar layoutY="2.0" prefHeight="25.0" prefWidth="1280.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+      <GridPane layoutX="532.0" layoutY="20.0" prefHeight="718.0" prefWidth="1270.0" AnchorPane.bottomAnchor="40.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0" AnchorPane.topAnchor="25.0">
+        <columnConstraints>
+          <ColumnConstraints hgrow="ALWAYS" maxWidth="1.7976931348623157E308" minWidth="-Infinity" />
+          <ColumnConstraints halignment="CENTER" hgrow="ALWAYS" maxWidth="-Infinity" minWidth="-Infinity" prefWidth="70.0" />
+            <ColumnConstraints hgrow="ALWAYS" maxWidth="1.7976931348623157E308" minWidth="-Infinity" />
+        </columnConstraints>
+        <rowConstraints>
+          <RowConstraints maxHeight="-Infinity" minHeight="-Infinity" prefHeight="25.0" vgrow="SOMETIMES" />
+          <RowConstraints maxHeight="1.7976931348623157E308" minHeight="-Infinity" vgrow="ALWAYS" />
+        </rowConstraints>
          <children>
-            <ProgressBar fx:id="transferProgress" layoutX="12.0" layoutY="33.0" prefHeight="18.0" prefWidth="450.0" progress="0.0" />
-            <Label fx:id="progressValue" alignment="CENTER" layoutX="469.0" layoutY="33.0" prefHeight="17.0" prefWidth="50.0" text="0 %" textAlignment="CENTER">
-               <font>
-                  <Font name="System Bold" size="12.0" />
-               </font>
-            </Label>
-            <Label fx:id="transferState" layoutX="12.0" layoutY="14.0" text="Передается:" />
-            <Label fx:id="transferFile" layoutX="86.0" layoutY="14.0" text="&lt;fileName&gt;" />
+            <TableView fx:id="clientFiles" onMouseClicked="#onClientFilesClicked" prefWidth="600.0" GridPane.rowIndex="1">
+              <columns>
+                <TableColumn fx:id="clientFileName" prefWidth="460.0" text="File Name" />
+                <TableColumn fx:id="clientFileSize" minWidth="0.0" prefWidth="140.0" text="File Size" />
+              </columns>
+               <GridPane.margin>
+                  <Insets top="5.0" />
+               </GridPane.margin>
+            </TableView>
+            <TableView fx:id="serverFiles" onMouseClicked="#onServerFilesClicked" prefHeight="683.0" prefWidth="600.0" GridPane.columnIndex="2" GridPane.rowIndex="1">
+              <columns>
+                <TableColumn fx:id="serverFileName" prefWidth="460.0" text="File Name" />
+                <TableColumn fx:id="serverFileSize" prefWidth="140.0" text="File Size" />
+              </columns>
+               <GridPane.margin>
+                  <Insets top="5.0" />
+               </GridPane.margin>
+            </TableView>
+            <HBox prefHeight="100.0" prefWidth="200.0" spacing="3.0" GridPane.hgrow="ALWAYS">
+               <children>
+                  <TextField fx:id="clientPath" onAction="#switchFolder" prefHeight="25.0" prefWidth="570.0" HBox.hgrow="ALWAYS" />
+                  <Button fx:id="btnClientFolderUp" alignment="CENTER" contentDisplay="CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" mnemonicParsing="false" onAction="#clientFolderUp" prefHeight="25.0" prefWidth="25.0" text="U" textAlignment="CENTER" HBox.hgrow="NEVER">
+                     <cursor>
+                        <Cursor fx:constant="HAND" />
+                     </cursor>
+                  </Button>
+                  <Button fx:id="btnClientFolder" alignment="CENTER" contentDisplay="CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" mnemonicParsing="false" onAction="#showFolderDialog" prefHeight="25.0" prefWidth="25.0" text="F" textAlignment="CENTER" HBox.hgrow="NEVER">
+                     <cursor>
+                        <Cursor fx:constant="HAND" />
+                     </cursor></Button>
+               </children>
+            </HBox>
+            <VBox alignment="CENTER" prefHeight="200.0" prefWidth="100.0" spacing="125.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+               <children>
+                  <Button fx:id="btnFileUpload" alignment="CENTER" contentDisplay="CENTER" mnemonicParsing="false" onAction="#sendFile" prefHeight="53.0" prefWidth="34.0" text="&gt;">
+                     <cursor>
+                        <Cursor fx:constant="HAND" />
+                     </cursor></Button>
+                  <Button fx:id="btnFileDownload" alignment="CENTER" contentDisplay="CENTER" mnemonicParsing="false" onAction="#requestFile" prefHeight="53.0" prefWidth="34.0" text="&lt;">
+                     <cursor>
+                        <Cursor fx:constant="HAND" />
+                     </cursor></Button>
+               </children>
+            </VBox>
+            <HBox alignment="CENTER" prefHeight="100.0" prefWidth="200.0" spacing="3.0" GridPane.columnIndex="2" GridPane.hgrow="ALWAYS">
+               <children>
+                  <TextField fx:id="serverPath" prefHeight="25.0" prefWidth="600.0" HBox.hgrow="ALWAYS" />
+                  <Button fx:id="btnServerFolderUp" alignment="CENTER" contentDisplay="CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" mnemonicParsing="false" onAction="#serverFolderUp" prefHeight="25.0" prefWidth="25.0" text="U" textAlignment="CENTER" HBox.hgrow="NEVER">
+                     <cursor>
+                        <Cursor fx:constant="HAND" />
+                     </cursor>
+                  </Button>
+               </children>
+            </HBox>
          </children>
-      </AnchorPane>
+         <padding>
+            <Insets top="5.0" />
+         </padding>
+      </GridPane>
+      <HBox alignment="CENTER" layoutX="517.0" layoutY="704.0" prefHeight="40.0" spacing="10.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0">
+         <padding>
+            <Insets bottom="10.0" left="10.0" right="10.0" top="5.0" />
+         </padding>
+         <children>
+            <Button fx:id="btnDoRename" maxHeight="-Infinity" maxWidth="1.7976931348623157E308" minHeight="-Infinity" mnemonicParsing="false" onAction="#doRename" prefHeight="25.0" HBox.hgrow="ALWAYS">
+               <graphic>
+                  <GridPane>
+                    <columnConstraints>
+                      <ColumnConstraints halignment="CENTER" hgrow="ALWAYS" maxWidth="-Infinity" minWidth="-Infinity" prefWidth="25.0" />
+                      <ColumnConstraints halignment="CENTER" hgrow="ALWAYS" maxWidth="1.7976931348623157E308" minWidth="100.0" />
+                    </columnConstraints>
+                    <rowConstraints>
+                      <RowConstraints maxHeight="-Infinity" minHeight="-Infinity" vgrow="SOMETIMES" />
+                    </rowConstraints>
+                     <children>
+                        <Label alignment="CENTER" contentDisplay="CENTER" text="F4" textAlignment="CENTER" />
+                        <Label text="Rename" GridPane.columnIndex="1" />
+                     </children>
+                  </GridPane>
+               </graphic>
+               <cursor>
+                  <Cursor fx:constant="HAND" />
+               </cursor>
+            </Button>
+            <Button fx:id="btnDoCopy" maxHeight="-Infinity" maxWidth="1.7976931348623157E308" minHeight="-Infinity" mnemonicParsing="false" onAction="#doCopy" prefHeight="25.0" HBox.hgrow="ALWAYS">
+               <graphic>
+                  <GridPane>
+                    <columnConstraints>
+                      <ColumnConstraints halignment="CENTER" hgrow="ALWAYS" maxWidth="-Infinity" minWidth="-Infinity" prefWidth="25.0" />
+                      <ColumnConstraints halignment="CENTER" hgrow="ALWAYS" maxWidth="1.7976931348623157E308" minWidth="100.0" />
+                    </columnConstraints>
+                    <rowConstraints>
+                      <RowConstraints maxHeight="-Infinity" minHeight="-Infinity" vgrow="SOMETIMES" />
+                    </rowConstraints>
+                     <children>
+                        <Label text="F5" />
+                        <Label fx:id="labCopyTo" text="Download" GridPane.columnIndex="1" />
+                     </children>
+                  </GridPane>
+               </graphic>
+               <cursor>
+                  <Cursor fx:constant="HAND" />
+               </cursor>
+            </Button>
+            <Button fx:id="btnCreateFolder" maxHeight="-Infinity" maxWidth="1.7976931348623157E308" minHeight="-Infinity" mnemonicParsing="false" onAction="#createFolder" prefHeight="25.0" HBox.hgrow="ALWAYS">
+               <graphic>
+                  <GridPane>
+                    <columnConstraints>
+                      <ColumnConstraints halignment="CENTER" hgrow="ALWAYS" maxWidth="-Infinity" minWidth="-Infinity" prefWidth="25.0" />
+                      <ColumnConstraints halignment="CENTER" hgrow="ALWAYS" maxWidth="1.7976931348623157E308" minWidth="100.0" />
+                    </columnConstraints>
+                    <rowConstraints>
+                      <RowConstraints maxHeight="-Infinity" minHeight="-Infinity" vgrow="SOMETIMES" />
+                    </rowConstraints>
+                     <children>
+                        <Label text="F7" />
+                        <Label text="Folder" GridPane.columnIndex="1" />
+                     </children>
+                  </GridPane>
+               </graphic>
+               <cursor>
+                  <Cursor fx:constant="HAND" />
+               </cursor>
+            </Button>
+            <Button fx:id="btnDoDelete" maxHeight="-Infinity" maxWidth="1.7976931348623157E308" minHeight="-Infinity" mnemonicParsing="false" onAction="#doDelete" prefHeight="25.0" HBox.hgrow="ALWAYS">
+               <graphic>
+                  <GridPane>
+                    <columnConstraints>
+                      <ColumnConstraints halignment="CENTER" hgrow="ALWAYS" maxWidth="-Infinity" minWidth="-Infinity" prefWidth="25.0" />
+                      <ColumnConstraints halignment="CENTER" hgrow="ALWAYS" maxWidth="1.7976931348623157E308" minWidth="100.0" />
+                    </columnConstraints>
+                    <rowConstraints>
+                      <RowConstraints maxHeight="-Infinity" minHeight="-Infinity" vgrow="SOMETIMES" />
+                    </rowConstraints>
+                     <children>
+                        <Label text="F8" />
+                        <Label text="Delete" GridPane.columnIndex="1" />
+                     </children>
+                  </GridPane>
+               </graphic>
+               <cursor>
+                  <Cursor fx:constant="HAND" />
+               </cursor>
+            </Button>
+         </children>
+      </HBox>
+       <AnchorPane fx:id="transferPane" layoutX="391.0" layoutY="243.0" prefHeight="65.0" prefWidth="530.0" style="-fx-background-color: #f8f8f8;" visible="false">
+           <children>
+               <ProgressBar fx:id="transferProgress" layoutX="12.0" layoutY="33.0" prefHeight="18.0" prefWidth="450.0" progress="0.0" />
+               <Label fx:id="progressValue" alignment="CENTER" layoutX="469.0" layoutY="33.0" prefHeight="17.0" prefWidth="50.0" text="0 %" textAlignment="CENTER">
+                   <font>
+                       <Font name="System Bold" size="12.0" />
+                   </font>
+               </Label>
+               <Label fx:id="transferState" layoutX="12.0" layoutY="14.0" text="Передается:" />
+               <Label fx:id="transferFile" layoutX="86.0" layoutY="14.0" text="&lt;fileName&gt;" />
+           </children>
+       </AnchorPane>
    </children>
+   <padding>
+      <Insets bottom="5.0" />
+   </padding>
 </AnchorPane>

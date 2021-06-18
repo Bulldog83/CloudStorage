@@ -56,6 +56,10 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 				FileConnection fileConnection = session.getFileChannel(channel.id());
 				if (fileConnection != null) {
 					networkHandler.handleFile(fileConnection, buffer);
+				} else {
+					logger.warn("Received file data, but FileChannel not registered.");
+					logger.warn("Session ID: " + session);
+					logger.warn("Channel: " + channel);
 				}
 			} else {
 				Optional<Packet> optionalPacket = Packet.read(buffer);
@@ -63,8 +67,8 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 					Packet packet = optionalPacket.get();
 					ctx.fireChannelRead(packet);
 				} else {
-					buffer.resetReaderIndex();
-					ctx.fireChannelRead(msg);
+					logger.warn("Unknown data received from: " + sessionId);
+					logger.warn("Channel: " + channel);
 				}
 			}
 		} else {
@@ -73,13 +77,13 @@ public class ServerInboundHandler extends ChannelInboundHandlerAdapter {
 				Packet packet = optionalPacket.get();
 				if (packet.getType() == PacketType.AUTH_DATA ||
 					packet.getType() == PacketType.SESSION ||
-					packet.getType() == PacketType.USER_DATA)
+					packet.getType() == PacketType.REGISTRATION_DATA)
 				{
 					ctx.fireChannelRead(packet);
 					return;
 				}
 			}
-			logger.info("Unregistered connection detected: " + channel.remoteAddress());
+			logger.info("Unregistered connection detected: " + channel);
 			ctx.writeAndFlush("No registered session found.");
 			channel.close();
 		}
